@@ -954,7 +954,6 @@ const HomePage = () => {
             </Box>
           </Box>
         </Container>
-        {/* Footer - Material UI */}
         
       </main>
       <Dialog open={showOrdersModal} onClose={() => setShowOrdersModal(false)} maxWidth="md" fullWidth>

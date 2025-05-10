@@ -271,6 +271,8 @@ const CartStatusModal = ({ open, onClose, cartItems = [], handleQuantityChange, 
 
       // 1. Place order (get order and payment details)
       const orderResponse = await orderService.placeOrder(orderData);
+      console.log('orderResponse:', orderResponse);
+
       let orderId;
       if (typeof orderResponse.order === 'string') {
         orderId = orderResponse.order;
@@ -282,6 +284,7 @@ const CartStatusModal = ({ open, onClose, cartItems = [], handleQuantityChange, 
 
       // 2. Initiate payment (get Razorpay order details from backend)
       const paymentDetails = await paymentService.initiatePayment(orderId);
+      console.log('paymentDetails:', paymentDetails);
 
       // 3. Open Razorpay checkout
       await openRazorpayCheckout({
@@ -418,8 +421,14 @@ const CartStatusModal = ({ open, onClose, cartItems = [], handleQuantityChange, 
                       style={{ width: 160, padding: '8px', borderRadius: 4, border: `1px solid ${theme.colors.border}` }}
                     />
                     <Button
-                      variant="contained"
-                      color="primary"
+                      variant="outlined"
+                      sx={{
+                        borderColor: theme.colors.primary,
+                        color: theme.colors.primary,
+                        background: 'transparent',
+                        fontWeight: 600,
+                        '&:hover': { borderColor: theme.colors.primary, bgcolor: theme.colors.card }
+                      }}
                       onClick={async () => {
                         if (!couponCode.trim()) {
                           setCouponFeedback('Please enter a coupon code.');
@@ -467,31 +476,39 @@ const CartStatusModal = ({ open, onClose, cartItems = [], handleQuantityChange, 
                         Please select a delivery address
                       </Typography>
                     )}
-                    <Button
-                      variant="outlined"
-                      sx={{
-                        mt: 2,
-                        textTransform: 'none',
-                        fontWeight: 600,
-                        borderColor: theme.colors.primary,
-                        color: theme.colors.primary,
-                        '&:hover': { borderColor: theme.colors.primary, bgcolor: theme.colors.card }
-                      }}
-                      onClick={() => setShowAddressModal(true)}
-                    >
-                      {selectedDeliveryAddress ? 'Change Selected Address' : 'Choose Delivery Address @@'}
-                    </Button>
-                  </Box>
-                  <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
-                    <Button
-                      variant="contained"
-                      color="primary"
-                      sx={{ textTransform: 'none', fontWeight: 700, minWidth: 200 }}
-                      onClick={() => setStep(1)}
-                      disabled={!selectedDeliveryAddress}
-                    >
-                      Next: Review & Pay
-                    </Button>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
+                      <Button
+                        variant="outlined"
+                        sx={{
+                          textTransform: 'none',
+                          fontWeight: 600,
+                          borderColor: theme.colors.primary,
+                          color: theme.colors.primary,
+                          background: 'transparent',
+                          '&:hover': { borderColor: theme.colors.primary, bgcolor: theme.colors.card }
+                        }}
+                        onClick={() => setShowAddressModal(true)}
+                      >
+                        {selectedDeliveryAddress ? 'Change Selected Address' : 'Choose Delivery Address @@'}
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        sx={{
+                          textTransform: 'none',
+                          fontWeight: 700,
+                          minWidth: 200,
+                          ml: 2,
+                          borderColor: theme.colors.primary,
+                          color: theme.colors.primary,
+                          background: 'transparent',
+                          '&:hover': { borderColor: theme.colors.primary, bgcolor: theme.colors.card }
+                        }}
+                        onClick={() => setStep(1)}
+                        disabled={!selectedDeliveryAddress}
+                      >
+                   Review & Pay
+                      </Button>
+                    </Box>
                   </Box>
                   <Dialog 
                     open={showAddressModal} 
@@ -588,9 +605,17 @@ const CartStatusModal = ({ open, onClose, cartItems = [], handleQuantityChange, 
                   Back
                 </Button>
                 <Button
-                  variant="contained"
+                  variant="outlined"
                   color="primary"
-                  sx={{ textTransform: 'none', fontWeight: 700, minWidth: 200, bgcolor: theme.colors.primary, color: theme.colors.buttonText, '&:hover': { bgcolor: theme.colors.primaryDark || theme.colors.primary } }}
+                  sx={{
+                    textTransform: 'none',
+                    fontWeight: 700,
+                    minWidth: 200,
+                    bgcolor: 'transparent',
+                    borderColor: theme.colors.primary,
+                    color: theme.colors.primary,
+                    '&:hover': { borderColor: theme.colors.primary, bgcolor: theme.colors.card }
+                  }}
                   onClick={handlePlaceOrder}
                   disabled={!selectedDeliveryAddress}
                 >

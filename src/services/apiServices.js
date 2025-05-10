@@ -1,13 +1,13 @@
 import axios from 'axios';
 
 // Base API URL
-// const API_BASE_URL = 'https://r2bserver.azurewebsites.net/api';
+const API_BASE_URL = 'https://r2bserver.azurewebsites.net/api';
 // const API_BASE_URL = 'https://obliging-humble-tortoise.ngrok-free.app/api';
 // const API_BASE_URL = 'https://acc9-2406-7400-10a-f972-d9fe-f1bc-8229-302c.ngrok-free.app/api'
 // const API_BASE_URL='http://192.168.1.10:8080/api'
 // const API_BASE_URL='https://greatly-magical-bluejay.ngrok-free.app/api'
   // const API_BASE_URL='https://equipped-piranha-briefly.ngrok-free.app/api'
-  const API_BASE_URL='http://192.168.1.106:8081/api'
+  // const API_BASE_URL='http://192.168.1.106:8081/api'
 
 
 // Create axios instance with default config

@@ -1,4 +1,4 @@
-import React, { useContext } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import AppBar from '@mui/material/AppBar';
 import Toolbar from '@mui/material/Toolbar';
 import Box from '@mui/material/Box';
@@ -42,6 +42,7 @@ import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SunnyIcon from '@mui/icons-material/Sunny';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
+import { GoogleMap, LoadScript, Marker, useJsApiLoader } from '@react-google-maps/api';
 
 const Navbar = ({
   handleSidebarOpen,
@@ -70,8 +71,22 @@ const Navbar = ({
   const [selectedDeliveryAddress, setSelectedDeliveryAddress] = React.useState(null);
   const [savedAddresses, setSavedAddresses] = React.useState([]);
   const [showAddressModal, setShowAddressModal] = React.useState(false);
+  const [showSelectAddressModal, setShowSelectAddressModal] = React.useState(false);
   const [selectedAddress, setSelectedAddress] = React.useState(null);
   const [snackbar, setSnackbar] = React.useState({ open: false, message: '', severity: 'info' });
+  const [showDetectModal, setShowDetectModal] = React.useState(false);
+  const [showConfirmModal, setShowConfirmModal] = React.useState(false);
+  const [currentLocation, setCurrentLocation] = useState(null);
+  const [mapError, setMapError] = useState(null);
+  const { isLoaded } = useJsApiLoader({
+    id: 'google-map-script',
+    googleMapsApiKey: "AIzaSyDA5ZUSnr2u0nw7Hu49Sm4ebhPte7AwiTM"
+  });
+  const [address, setAddress] = useState('');
+  const [isLoadingAddress, setIsLoadingAddress] = useState(false);
+  const [houseNumber, setHouseNumber] = useState("");
+  const [landmark, setLandmark] = useState("");
+  const [selectedLabel, setSelectedLabel] = useState("");
 
   // Determine if back button should be shown
   const showBackButton =
@@ -112,6 +127,59 @@ const Navbar = ({
     const parts = address.split(',');
     return parts.slice(0, 4).join(',').trim();
   };
+
+  const mapContainerStyle = {
+    width: '100%',
+    height: '300px'
+  };
+
+  const getCurrentLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setCurrentLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          });
+        },
+        (error) => {
+          setMapError('Error getting location: ' + error.message);
+        }
+      );
+    } else {
+      setMapError('Geolocation is not supported by your browser');
+    }
+  };
+
+  useEffect(() => {
+    if (showDetectModal) {
+      getCurrentLocation();
+    }
+  }, [showDetectModal]);
+
+  const getAddressFromCoordinates = async (lat, lng) => {
+    setIsLoadingAddress(true);
+    try {
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=AIzaSyDA5ZUSnr2u0nw7Hu49Sm4ebhPte7AwiTM`
+      );
+      const data = await response.json();
+      if (data.results && data.results[0]) {
+        setAddress(data.results[0].formatted_address);
+      }
+    } catch (error) {
+      console.error('Error fetching address:', error);
+      setAddress('Address not available');
+    }
+    setIsLoadingAddress(false);
+  };
+
+  useEffect(() => {
+    if (currentLocation) {
+      getAddressFromCoordinates(currentLocation.lat, currentLocation.lng);
+    }
+  }, [currentLocation]);
+
   return (
     <>
       <AppBar position="sticky" elevation={0} sx={{ bgcolor: theme.colors.background, color: theme.colors.text, borderBottom: `1px solid ${theme.colors.border}`, boxShadow: '0 4px 24px rgba(0,0,0,0.13)' }}>
@@ -225,6 +293,27 @@ const Navbar = ({
                             <Typography sx={{ fontWeight: 500, fontSize: 14, color: theme.modal.text }}>
                               {selectedDeliveryAddress?.formattedAddress || selectedDeliveryAddress?.address || 'No address selected'}
                             </Typography>
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              sx={{
+                                mt: 1.5,
+                                bgcolor: theme.modalButton.secondary,
+                                color: theme.modalButton.secondaryText,
+                                border: `2px solid ${theme.modalButton.border}`,
+                                borderRadius: theme.modalButton.borderRadius,
+                                fontWeight: 500,
+                                fontSize: 14,
+                                py: 0.5,
+                                px: 2,
+                                minWidth: 70,
+                                boxShadow: 'none',
+                                '&:hover': { bgcolor: theme.modalButton.secondary }
+                              }}
+                              onClick={() => setShowAddressModal(true)}
+                            >
+                              Change Delivery Address
+                            </Button>
                           </CardContent>
                         </Card>
                         <Box sx={{ display: 'flex', flexDirection: 'row', gap: 1.5, mt: 2 }}>
@@ -244,45 +333,7 @@ const Navbar = ({
                               boxShadow: 'none',
                               '&:hover': { bgcolor: theme.modalButton.primary }
                             }}
-                            onClick={async () => {
-                              setIsDetecting(true);
-                              try {
-                                const detected = await locationService.getCurrentLocation();
-                                setIsDetecting(false);
-                                let addresses = await locationService.getSavedAddresses();
-                                if (!addresses || addresses.length === 0) {
-                                  await locationService.saveAddress(detected);
-                                  setSavedAddresses([detected]);
-                                  setSelectedDeliveryAddress(detected);
-                                  setLocationAddress(detected.formattedAddress || detected.address);
-                                  setShowLocationModal(false);
-                                  return;
-                                }
-                                const selected = selectedDeliveryAddress;
-                                const sameCoords =
-                                  selected &&
-                                  detected &&
-                                  selected.coordinates &&
-                                  detected.coordinates &&
-                                  selected.coordinates.latitude === detected.coordinates.latitude &&
-                                  selected.coordinates.longitude === detected.coordinates.longitude;
-                                const selectedAddr = selected?.formattedAddress || selected?.address;
-                                const detectedAddr = detected?.formattedAddress || detected?.address;
-                                const sameAddress = selectedAddr && detectedAddr && selectedAddr === detectedAddr;
-                                if (sameCoords && sameAddress) {
-                                  setSnackbar({ open: true, message: 'Selected address is same as the address detected', severity: 'info' });
-                                  setShowLocationModal(false);
-                                  return;
-                                }
-                                await locationService.storeSelectedAddress(detected);
-                                setSelectedDeliveryAddress(detected);
-                                setLocationAddress(detected.formattedAddress || detected.address);
-                                setShowLocationModal(false);
-                              } catch (e) {
-                                setIsDetecting(false);
-                                // Optionally show error feedback
-                              }
-                            }}
+                            onClick={() => setShowDetectModal(true)}
                             disabled={isDetecting}
                           >
                             Detect Current Location
@@ -303,9 +354,9 @@ const Navbar = ({
                               boxShadow: 'none',
                               '&:hover': { bgcolor: theme.modalButton.secondary }
                             }}
-                            onClick={() => setShowAddressModal(true)}
+                            onClick={() => setShowSelectAddressModal(true)}
                           >
-                            Select Delivery Address
+                            Search Delivery Location
                           </Button>
                         </Box>
                         {/* Address Modal inside Location Modal */}
@@ -484,6 +535,507 @@ const Navbar = ({
           {snackbar.message}
         </MuiAlert>
       </Snackbar>
+      <Dialog open={showDetectModal} onClose={() => setShowDetectModal(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', bgcolor: theme.modal.background, color: theme.modal.text, minHeight: 0, py: 1, borderRadius: `${theme.modal.borderRadius}px ${theme.modal.borderRadius}px 0 0` }}>
+          <Typography sx={{
+            position: 'absolute',
+            left: '50%',
+            top: '50%',
+            transform: 'translate(-50%, -50%)',
+            fontWeight: 600,
+            fontSize: '1.1rem',
+            color: theme.modal.text,
+            textAlign: 'center',
+            width: '100%',
+            pointerEvents: 'none',
+          }}>
+            Your Current Location
+          </Typography>
+          <IconButton onClick={() => setShowDetectModal(false)} size="large" sx={{ color: theme.modalCloseIcon.color, zIndex: 1 }}>
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ bgcolor: theme.modal.background, minWidth: '400px' }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, p: 2 }}>
+            <Box
+              sx={{
+                p: 2,
+                border: `1px solid ${theme.colors.border}`,
+                bgcolor: theme.colors.card,
+                '&:hover': {
+                  borderColor: theme.colors.primary,
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                },
+                transition: 'all 0.2s ease-in-out',
+                cursor: 'pointer',
+                width: '100%'
+              }}
+            >
+              {mapError ? (
+                <Typography sx={{ color: 'error.main', textAlign: 'center', fontSize: '1.1rem' }}>
+                  {mapError}
+                </Typography>
+              ) : !isLoaded ? (
+                <Box sx={{ height: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <CircularProgress size={40} />
+                </Box>
+              ) : (
+                <Box sx={{ position: 'relative', width: '100%', height: '300px', bgcolor: theme.colors.card, borderRadius: 2, border: `1px solid ${theme.colors.border}` }}>
+                  <GoogleMap
+                    mapContainerStyle={{
+                      width: '100%',
+                      height: '300px'
+                    }}
+                    center={currentLocation}
+                    zoom={16}
+                    options={{ disableDefaultUI: true }}
+                  >
+                    <Marker
+                      position={currentLocation}
+                      animation={google.maps.Animation.DROP}
+                    />
+                  </GoogleMap>
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      bottom: 8,
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      bgcolor: theme.colors.card,
+                      border: `1px solid ${theme.colors.border}`,
+                      borderRadius: 2,
+                      boxShadow: '0 4px 16px rgba(0,0,0,0.10)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      px: 2,
+                      py: 1,
+                      minWidth: '90%',
+                      maxWidth: '98%',
+                      zIndex: 2,
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+                      <LocationOnIcon sx={{ color: theme.colors.primary, mr: 1, fontSize: 24 }} />
+                      {isLoadingAddress ? (
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <CircularProgress size={20} sx={{ mr: 1 }} />
+                          <Typography sx={{ color: theme.colors.text }}>
+                            Fetching address...
+                          </Typography>
+                        </Box>
+                      ) : (
+                        <Typography 
+                          sx={{ 
+                            color: theme.colors.text,
+                            fontSize: '0.80rem',
+                            fontWeight: 500,
+                            wordBreak: 'break-word',
+                            whiteSpace: 'pre-line'
+                          }}
+                        >
+                          {address || 'Address not available'}
+                        </Typography>
+                      )}
+                    </Box>
+                  </Box>
+                </Box>
+              )}
+            </Box>
+            <Box sx={{ display: 'flex', flexDirection: 'row', gap: 1, mt: 1, mb: 1 }}>
+              <TextField
+                fullWidth
+                label=""
+                variant="outlined"
+                size="small"
+                placeholder="Add house number"
+                required
+                value={houseNumber}
+                onChange={e => setHouseNumber(e.target.value)}
+                sx={{ '& .MuiOutlinedInput-root.Mui-focused fieldset': { borderColor: theme.colors.primary } }}
+              />
+              <TextField
+                fullWidth
+                label=""
+                variant="outlined"
+                size="small"
+                placeholder="Add landmark"
+                required
+                value={landmark}
+                onChange={e => setLandmark(e.target.value)}
+                sx={{ '& .MuiOutlinedInput-root.Mui-focused fieldset': { borderColor: theme.colors.primary } }}
+              />
+            </Box>
+            <Box sx={{ display: 'flex', flexDirection: 'row', justifyContent: 'center', gap: 2, mb: 1, width: '100%' }}>
+              <Button
+                variant={selectedLabel === 'Home' ? 'contained' : 'outlined'}
+                size="small"
+                sx={{
+                  flex: 1,
+                  borderRadius: 2,
+                  fontWeight: 500,
+                  textTransform: 'none',
+                  px: 0,
+                  minWidth: 0,
+                  maxWidth: '100%',
+                  bgcolor: selectedLabel === 'Home' ? theme.colors.primary : theme.colors.card,
+                  color: selectedLabel === 'Home' ? theme.colors.buttonText || '#fff' : theme.colors.text,
+                  borderColor: theme.colors.primary,
+                  '&:hover': {
+                    bgcolor: selectedLabel === 'Home' ? theme.colors.primary : theme.colors.background,
+                    color: selectedLabel === 'Home' ? theme.colors.buttonText || '#fff' : theme.colors.primary,
+                    borderColor: theme.colors.primary
+                  }
+                }}
+                onClick={() => setSelectedLabel('Home')}
+              >
+                Home
+              </Button>
+              <Button
+                variant={selectedLabel === 'Work' ? 'contained' : 'outlined'}
+                size="small"
+                sx={{
+                  flex: 1,
+                  borderRadius: 2,
+                  fontWeight: 500,
+                  textTransform: 'none',
+                  px: 0,
+                  minWidth: 0,
+                  maxWidth: '100%',
+                  bgcolor: selectedLabel === 'Work' ? theme.colors.primary : theme.colors.card,
+                  color: selectedLabel === 'Work' ? theme.colors.buttonText || '#fff' : theme.colors.text,
+                  borderColor: theme.colors.primary,
+                  '&:hover': {
+                    bgcolor: selectedLabel === 'Work' ? theme.colors.primary : theme.colors.background,
+                    color: selectedLabel === 'Work' ? theme.colors.buttonText || '#fff' : theme.colors.primary,
+                    borderColor: theme.colors.primary
+                  }
+                }}
+                onClick={() => setSelectedLabel('Work')}
+              >
+                Work
+              </Button>
+              <Button
+                variant={selectedLabel === 'Others' ? 'contained' : 'outlined'}
+                size="small"
+                sx={{
+                  flex: 1,
+                  borderRadius: 2,
+                  fontWeight: 500,
+                  textTransform: 'none',
+                  px: 0,
+                  minWidth: 0,
+                  maxWidth: '100%',
+                  bgcolor: selectedLabel === 'Others' ? theme.colors.primary : theme.colors.card,
+                  color: selectedLabel === 'Others' ? theme.colors.buttonText || '#fff' : theme.colors.text,
+                  borderColor: theme.colors.primary,
+                  '&:hover': {
+                    bgcolor: selectedLabel === 'Others' ? theme.colors.primary : theme.colors.background,
+                    color: selectedLabel === 'Others' ? theme.colors.buttonText || '#fff' : theme.colors.primary,
+                    borderColor: theme.colors.primary
+                  }
+                }}
+                onClick={() => setSelectedLabel('Others')}
+              >
+                Others
+              </Button>
+            </Box>
+            <Button
+              variant="contained"
+              color="primary"
+              sx={{
+                mt: 1,
+                width: '100%',
+                fontWeight: 600,
+                fontSize: '0.95rem',
+                py: 0.7,
+                borderRadius: 2,
+                boxShadow: 'none',
+                bgcolor: theme.colors.primary,
+                color: theme.colors.buttonText || '#fff',
+                minHeight: '32px',
+                '&:hover': { bgcolor: theme.colors.primary }
+              }}
+              size="small"
+              onClick={() => {
+                const addressObj = {
+                  label: selectedLabel,
+                  address: address,
+                  formattedAddress: `${houseNumber} ${address} landmark:${landmark}`,
+                  coordinates: currentLocation ? {
+                    latitude: currentLocation.lat,
+                    longitude: currentLocation.lng
+                  } : {},
+                  timestamp: Date.now()
+                };
+                // Get current saved addresses from localStorage
+                let saved = [];
+                try {
+                  saved = JSON.parse(localStorage.getItem('savedAddresses')) || [];
+                } catch (e) { saved = []; }
+                // Check for duplicate by address field
+                const alreadyExists = saved.some(a => a.address === addressObj.address);
+                if (alreadyExists) {
+                  setShowLocationModal(false);
+                  setShowDetectModal(false);
+                  setSnackbar({ open: true, message: 'Address is already added.', severity: 'error' });
+                  setShowConfirmModal(false);
+                  return;
+                }
+                // Add new address
+                saved.push(addressObj);
+                // Save back to localStorage
+                localStorage.setItem('savedAddresses', JSON.stringify(saved));
+                // Update state
+                setSavedAddresses(saved);
+                setShowLocationModal(false);
+                setShowDetectModal(false);
+                setSnackbar({ open: true, message: 'Address added.', severity: 'success' });
+                setShowConfirmModal(false);
+              }}
+              disabled={!houseNumber || !landmark || !selectedLabel}
+            >
+              Confirm Location
+            </Button>
+          </Box>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={showConfirmModal} onClose={() => setShowConfirmModal(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', bgcolor: theme.modal.background, color: theme.modal.text, minHeight: 0, py: 1, borderRadius: `${theme.modal.borderRadius}px ${theme.modal.borderRadius}px 0 0` }}>
+          <IconButton onClick={() => setShowConfirmModal(false)} size="large" sx={{ color: theme.modalCloseIcon.color }}>
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ bgcolor: theme.modal.background, minHeight: 120 }}>
+          {/* Blank modal content for now */}
+        </DialogContent>
+      </Dialog>
+      <Dialog open={showSelectAddressModal} onClose={() => setShowSelectAddressModal(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', bgcolor: theme.modal.background, color: theme.modal.text, minHeight: 0, py: 1, borderRadius: `${theme.modal.borderRadius}px ${theme.modal.borderRadius}px 0 0` }}>
+          <IconButton onClick={() => setShowSelectAddressModal(false)} size="large" sx={{ color: theme.modalCloseIcon.color }}>
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ bgcolor: theme.modal.background, minWidth: '400px' }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, p: 2 }}>
+            <Box sx={{ position: 'relative', width: '100%', height: '300px', bgcolor: theme.colors.card, borderRadius: 2, border: `1px solid ${theme.colors.border}` }}>
+              <GoogleMap
+                mapContainerStyle={{
+                  width: '100%',
+                  height: '300px'
+                }}
+                center={currentLocation}
+                zoom={16}
+                options={{ disableDefaultUI: true }}
+              >
+                <Marker
+                  position={currentLocation}
+                  animation={google.maps.Animation.DROP}
+                />
+              </GoogleMap>
+              <Box
+                sx={{
+                  position: 'absolute',
+                  bottom: 8,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  bgcolor: theme.colors.card,
+                  border: `1px solid ${theme.colors.border}`,
+                  borderRadius: 2,
+                  boxShadow: '0 4px 16px rgba(0,0,0,0.10)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  px: 2,
+                  py: 1,
+                  minWidth: '90%',
+                  maxWidth: '98%',
+                  zIndex: 2,
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+                  <LocationOnIcon sx={{ color: theme.colors.primary, mr: 1, fontSize: 24 }} />
+                  {isLoadingAddress ? (
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <CircularProgress size={20} sx={{ mr: 1 }} />
+                      <Typography sx={{ color: theme.colors.text }}>
+                        Fetching address...
+                      </Typography>
+                    </Box>
+                  ) : (
+                    <Typography 
+                      sx={{ 
+                        color: theme.colors.text,
+                        fontSize: '0.80rem',
+                        fontWeight: 500,
+                        wordBreak: 'break-word',
+                        whiteSpace: 'pre-line'
+                      }}
+                    >
+                      {address || 'Address not available'}
+                    </Typography>
+                  )}
+                </Box>
+              </Box>
+            </Box>
+            <Box sx={{ display: 'flex', flexDirection: 'row', gap: 1, mt: 1, mb: 1 }}>
+              <TextField
+                fullWidth
+                label=""
+                variant="outlined"
+                size="small"
+                placeholder="Add house number"
+                required
+                value={houseNumber}
+                onChange={e => setHouseNumber(e.target.value)}
+                sx={{ '& .MuiOutlinedInput-root.Mui-focused fieldset': { borderColor: theme.colors.primary } }}
+              />
+              <TextField
+                fullWidth
+                label=""
+                variant="outlined"
+                size="small"
+                placeholder="Add landmark"
+                required
+                value={landmark}
+                onChange={e => setLandmark(e.target.value)}
+                sx={{ '& .MuiOutlinedInput-root.Mui-focused fieldset': { borderColor: theme.colors.primary } }}
+              />
+            </Box>
+            <Box sx={{ display: 'flex', flexDirection: 'row', justifyContent: 'center', gap: 2, mb: 1, width: '100%' }}>
+              <Button
+                variant={selectedLabel === 'Home' ? 'contained' : 'outlined'}
+                size="small"
+                sx={{
+                  flex: 1,
+                  borderRadius: 2,
+                  fontWeight: 500,
+                  textTransform: 'none',
+                  px: 0,
+                  minWidth: 0,
+                  maxWidth: '100%',
+                  bgcolor: selectedLabel === 'Home' ? theme.colors.primary : theme.colors.card,
+                  color: selectedLabel === 'Home' ? theme.colors.buttonText || '#fff' : theme.colors.text,
+                  borderColor: theme.colors.primary,
+                  '&:hover': {
+                    bgcolor: selectedLabel === 'Home' ? theme.colors.primary : theme.colors.background,
+                    color: selectedLabel === 'Home' ? theme.colors.buttonText || '#fff' : theme.colors.primary,
+                    borderColor: theme.colors.primary
+                  }
+                }}
+                onClick={() => setSelectedLabel('Home')}
+              >
+                Home
+              </Button>
+              <Button
+                variant={selectedLabel === 'Work' ? 'contained' : 'outlined'}
+                size="small"
+                sx={{
+                  flex: 1,
+                  borderRadius: 2,
+                  fontWeight: 500,
+                  textTransform: 'none',
+                  px: 0,
+                  minWidth: 0,
+                  maxWidth: '100%',
+                  bgcolor: selectedLabel === 'Work' ? theme.colors.primary : theme.colors.card,
+                  color: selectedLabel === 'Work' ? theme.colors.buttonText || '#fff' : theme.colors.text,
+                  borderColor: theme.colors.primary,
+                  '&:hover': {
+                    bgcolor: selectedLabel === 'Work' ? theme.colors.primary : theme.colors.background,
+                    color: selectedLabel === 'Work' ? theme.colors.buttonText || '#fff' : theme.colors.primary,
+                    borderColor: theme.colors.primary
+                  }
+                }}
+                onClick={() => setSelectedLabel('Work')}
+              >
+                Work
+              </Button>
+              <Button
+                variant={selectedLabel === 'Others' ? 'contained' : 'outlined'}
+                size="small"
+                sx={{
+                  flex: 1,
+                  borderRadius: 2,
+                  fontWeight: 500,
+                  textTransform: 'none',
+                  px: 0,
+                  minWidth: 0,
+                  maxWidth: '100%',
+                  bgcolor: selectedLabel === 'Others' ? theme.colors.primary : theme.colors.card,
+                  color: selectedLabel === 'Others' ? theme.colors.buttonText || '#fff' : theme.colors.text,
+                  borderColor: theme.colors.primary,
+                  '&:hover': {
+                    bgcolor: selectedLabel === 'Others' ? theme.colors.primary : theme.colors.background,
+                    color: selectedLabel === 'Others' ? theme.colors.buttonText || '#fff' : theme.colors.primary,
+                    borderColor: theme.colors.primary
+                  }
+                }}
+                onClick={() => setSelectedLabel('Others')}
+              >
+                Others
+              </Button>
+            </Box>
+            <Button
+              variant="contained"
+              color="primary"
+              sx={{
+                mt: 1,
+                width: '100%',
+                fontWeight: 600,
+                fontSize: '0.95rem',
+                py: 0.7,
+                borderRadius: 2,
+                boxShadow: 'none',
+                bgcolor: theme.colors.primary,
+                color: theme.colors.buttonText || '#fff',
+                minHeight: '32px',
+                '&:hover': { bgcolor: theme.colors.primary }
+              }}
+              size="small"
+              onClick={() => {
+                const addressObj = {
+                  label: selectedLabel,
+                  address: address,
+                  formattedAddress: `${houseNumber} ${address} landmark:${landmark}`,
+                  coordinates: currentLocation ? {
+                    latitude: currentLocation.lat,
+                    longitude: currentLocation.lng
+                  } : {},
+                  timestamp: Date.now()
+                };
+                // Get current saved addresses from localStorage
+                let saved = [];
+                try {
+                  saved = JSON.parse(localStorage.getItem('savedAddresses')) || [];
+                } catch (e) { saved = []; }
+                // Check for duplicate by address field
+                const alreadyExists = saved.some(a => a.address === addressObj.address);
+                if (alreadyExists) {
+                  setShowLocationModal(false);
+                  setShowDetectModal(false);
+                  setSnackbar({ open: true, message: 'Address is already added.', severity: 'error' });
+                  setShowConfirmModal(false);
+                  setShowSelectAddressModal(false);
+                  return;
+                }
+                // Add new address
+                saved.push(addressObj);
+                // Save back to localStorage
+                localStorage.setItem('savedAddresses', JSON.stringify(saved));
+                // Update state
+                setSavedAddresses(saved);
+                setShowLocationModal(false);
+                setShowDetectModal(false);
+                setSnackbar({ open: true, message: 'Address added.', severity: 'success' });
+                setShowConfirmModal(false);
+                setShowSelectAddressModal(false);
+              }}
+              disabled={!houseNumber || !landmark || !selectedLabel}
+            >
+              Confirm Location
+            </Button>
+          </Box>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };
