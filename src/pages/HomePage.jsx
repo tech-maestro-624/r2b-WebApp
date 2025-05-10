@@ -391,14 +391,14 @@ const HomePage = () => {
         <DialogActions sx={{ bgcolor: theme.colors.card, pb: 3, px: 3, justifyContent: 'center' }}>
           <Button
             variant="contained"
-            sx={{ bgcolor: theme.colors.primary, color: '#fff', fontWeight: 600, fontSize: 18, borderRadius: 0, px: 4, py: 1, boxShadow: 'none', '&:hover': { bgcolor: theme.colors.primary }, mr: 2 }}
+            sx={{ bgcolor: theme.colors.primary, color: '#fff', fontWeight: 600, fontSize: 18, borderRadius: 2, px: 4, py: 1, boxShadow: 'none', '&:hover': { bgcolor: theme.colors.primary }, mr: 2 }}
             onClick={async () => { setShowLogoutModal(false); await logout(); }}
           >
             Logout
           </Button>
           <Button
             variant="outlined"
-            sx={{ color: theme.colors.text, borderColor: theme.colors.border, fontWeight: 600, fontSize: 18, borderRadius: 0, px: 4, py: 1, boxShadow: 'none', '&:hover': { borderColor: theme.colors.primary } }}
+            sx={{ color: theme.colors.text, borderColor: theme.colors.border, fontWeight: 600, fontSize: 18, borderRadius: 2, px: 4, py: 1, boxShadow: 'none', '&:hover': { borderColor: theme.colors.primary } }}
             onClick={() => setShowLogoutModal(false)}
           >
             Cancel
@@ -418,12 +418,12 @@ const HomePage = () => {
           sx: {
             bgcolor: theme.modal.background,
             color: theme.modal.text,
-            borderRadius: 0,
+            borderRadius: theme.modal.borderRadius,
             boxShadow: theme.modal.boxShadow,
           }
         }}
       >
-        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', bgcolor: theme.modal.background, color: theme.modal.text, minHeight: 0, py: 1, borderRadius: '0 0 0 0' }}>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', bgcolor: theme.modal.background, color: theme.modal.text, minHeight: 0, py: 1, borderRadius: `${theme.modal.borderRadius}px ${theme.modal.borderRadius}px 0 0` }}>
           <IconButton onClick={() => { 
             setShowAddressModal(false);
           }} size="large" sx={{ color: theme.modalCloseIcon.color }}>
@@ -469,8 +469,8 @@ const HomePage = () => {
         boxSizing: 'border-box',
       }}>
         {/* Header - Material UI */}
-        <Box component="header" sx={{ width: '100%', py: `${theme.spacing.xl}px`, bgcolor: theme.colors.background, borderBottom: `1px solid ${theme.colors.border}`, textAlign: 'center', position: 'relative' }}>
-          <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', position: 'relative', maxWidth: 800, mx: 'auto' }}>
+        <Box component="header" sx={{ width: '100%', py: `${theme.spacing.xl}px`, bgcolor: theme.colors.background, borderBottom: `1px solid ${theme.colors.border}`, textAlign: 'center' }}>
+          <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
             <TextField
               placeholder="Search for restaurants, dishes, or cuisines..."
               variant="outlined"
@@ -481,12 +481,12 @@ const HomePage = () => {
                 maxWidth: 800,
                 mx: 'auto',
                 bgcolor: theme.colors.card,
-                borderRadius: 0,
+                borderRadius: 3,
                 boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
                 '& .MuiOutlinedInput-root': {
                   fontSize: 18,
                   fontWeight: 500,
-                  borderRadius: 0,
+                  borderRadius: 3,
                   background: theme.colors.card,
                   color: theme.colors.text,
                   '& fieldset': {
@@ -511,51 +511,35 @@ const HomePage = () => {
                 ),
               }}
             />
-            {/* Search Results Dropdown Overlay */}
-            {(!searching && searchResults.length > 0) && (
-              <Box sx={{
-                position: 'absolute',
-                left: 0,
-                right: 0,
-                top: '100%',
-                zIndex: 10,
-                mt: 1,
-                maxHeight: 350,
-                overflowY: 'auto',
-                bgcolor: theme.colors.card,
-                borderRadius: 0,
-                boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
-                p: 2,
-                width: '100%',
-                border: `1.5px solid ${theme.colors.border}`,
-              }}>
-                {searchResults.map((item, idx) => (
-                  <Box
-                    key={item._id || idx}
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      borderBottom: idx !== searchResults.length - 1 ? `1px solid ${theme.colors.border}` : 'none',
-                      py: 1,
-                      cursor: 'pointer',
-                      '&:hover': { background: `${theme.colors.primary}10` }
-                    }}
-                    onClick={() => navigate(`/search?keyword=${encodeURIComponent(searchValue)}`)}
-                  >
-                    <Box>
-                      <Typography sx={{ fontWeight: 600, fontSize: 18 }}>{item.dishName}</Typography>
-                      <Typography sx={{ color: theme.colors.secondaryText, fontSize: 15 }}>{item.restaurantName || item.branchName}</Typography>
-                    </Box>
-                    <Typography sx={{ fontWeight: 700, color: theme.colors.primary, fontSize: 18 }}>₹{item.price}</Typography>
-                  </Box>
-                ))}
-              </Box>
-            )}
           </Box>
-          {/* Search Results (Loading) */}
+          {/* Search Results */}
           {searching && (
             <Box sx={{ mt: 2, textAlign: 'center', color: theme.colors.primary, fontWeight: 600 }}>Searching...</Box>
+          )}
+          {!searching && searchResults.length > 0 && (
+            <Box sx={{ mt: 2, maxWidth: 800, mx: 'auto', bgcolor: theme.colors.card, borderRadius: 2, boxShadow: '0 2px 8px rgba(0,0,0,0.08)', p: 2 }}>
+              {searchResults.map((item, idx) => (
+                <Box
+                  key={item._id || idx}
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    borderBottom: idx !== searchResults.length - 1 ? `1px solid ${theme.colors.border}` : 'none',
+                    py: 1,
+                    cursor: 'pointer',
+                    '&:hover': { background: `${theme.colors.primary}10` }
+                  }}
+                  onClick={() => navigate(`/search?keyword=${encodeURIComponent(searchValue)}`)}
+                >
+                  <Box>
+                    <Typography sx={{ fontWeight: 600, fontSize: 18 }}>{item.dishName}</Typography>
+                    <Typography sx={{ color: theme.colors.secondaryText, fontSize: 15 }}>{item.restaurantName || item.branchName}</Typography>
+                  </Box>
+                  <Typography sx={{ fontWeight: 700, color: theme.colors.primary, fontSize: 18 }}>₹{item.price}</Typography>
+                </Box>
+              ))}
+            </Box>
           )}
         </Box>
         <Container
@@ -566,7 +550,7 @@ const HomePage = () => {
             maxWidth: 1400,
             margin: `${theme.spacing.md}px auto`,
             background: theme.colors.background,
-            borderRadius: 0,
+            borderRadius: theme.borderRadius.large,
             boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
             padding: `${theme.spacing.xl}px ${theme.spacing.lg}px`,
             textAlign: 'center',
@@ -775,8 +759,8 @@ const HomePage = () => {
               >
                 {loadingFeatured ? (
                   Array.from({ length: 4 }).map((_, idx) => (
-                    <Card key={idx} sx={{ minWidth: 320, maxWidth: 320, borderRadius: 0, p: 1, boxShadow: '0 1px 4px rgba(0,0,0,0.07)', background: theme.colors.card }}>
-                      <Skeleton variant="rectangular" width="100%" height={120} sx={{ mb: 1, borderRadius: 0, bgcolor: theme.colors.card }} />
+                    <Card key={idx} sx={{ minWidth: 320, maxWidth: 320, borderRadius: theme.borderRadius.medium, p: 1, boxShadow: '0 1px 4px rgba(0,0,0,0.07)', background: theme.colors.card }}>
+                      <Skeleton variant="rectangular" width="100%" height={120} sx={{ mb: 1, borderRadius: 2, bgcolor: theme.colors.card }} />
                       <CardContent sx={{ p: 1 }}>
                         <Skeleton variant="text" width="60%" height={24} sx={{ bgcolor: theme.colors.card }} />
                         <Skeleton variant="text" width="40%" height={18} sx={{ bgcolor: theme.colors.card }} />
@@ -787,7 +771,7 @@ const HomePage = () => {
                   featuredRestaurants.map((rest) => (
                     <Card key={rest.id} sx={{
                       background: theme.colors.card,
-                      borderRadius: 0,
+                      borderRadius: 3,
                       width: 320,
                       minWidth: 320,
                       maxWidth: 320,
@@ -887,8 +871,8 @@ const HomePage = () => {
             >
               {loadingNearbyRestaurants ? (
                 Array.from({ length: 3 }).map((_, idx) => (
-                  <Card key={idx} sx={{ minWidth: 260, maxWidth: 360, borderRadius: 0, p: 1, boxShadow: '0 1px 4px rgba(0,0,0,0.07)', background: theme.colors.card }}>
-                    <Skeleton variant="rectangular" width="100%" height={120} sx={{ mb: 1, borderRadius: 0, bgcolor: theme.colors.card }} />
+                  <Card key={idx} sx={{ minWidth: 260, maxWidth: 360, borderRadius: theme.borderRadius.medium, p: 1, boxShadow: '0 1px 4px rgba(0,0,0,0.07)', background: theme.colors.card }}>
+                    <Skeleton variant="rectangular" width="100%" height={120} sx={{ mb: 1, borderRadius: 2, bgcolor: theme.colors.card }} />
                     <CardContent sx={{ p: 1 }}>
                       <Skeleton variant="text" width="60%" height={24} sx={{ bgcolor: theme.colors.card }} />
                       <Skeleton variant="text" width="40%" height={18} sx={{ bgcolor: theme.colors.card }} />
@@ -905,7 +889,7 @@ const HomePage = () => {
                     <Card sx={{
                         background: notServiceable ? `${theme.colors.card}80` : theme.colors.card,
                         opacity: notServiceable ? 0.7 : 1,
-                      borderRadius: 0,
+                      borderRadius: 3,
                       width: 320,
                       minWidth: 320,
                       maxWidth: 320,
