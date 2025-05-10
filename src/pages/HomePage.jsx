@@ -68,6 +68,19 @@ const HomePage = () => {
   const [searching, setSearching] = useState(false);
   const debounceRef = useRef();
 
+  // Veg Only filter state
+  const [isVegOnly, setIsVegOnly] = useState(() => {
+    const saved = localStorage.getItem('isVegOnly');
+    return saved ? JSON.parse(saved) : false;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('isVegOnly', JSON.stringify(isVegOnly));
+  }, [isVegOnly]);
+
+  // Filtered search results based on veg filter
+  const filteredSearchResults = searchResults.filter(item => !isVegOnly || item.dishType === 'veg');
+
   console.log('isAuthenticated:', isAuthenticated);
   const navigate = useNavigate();
   // Memoized scroll handlers to avoid unnecessary re-renders
@@ -353,6 +366,11 @@ const HomePage = () => {
     }
   }, [loading, loadingFeatured, loadingNearbyRestaurants]);
 
+  // Add this after searchResults is updated
+  useEffect(() => {
+    console.log('Search Results:', searchResults);
+  }, [searchResults]);
+
   if (loading || loadingFeatured || loadingNearbyRestaurants) {
     return (
       <Box sx={{
@@ -516,16 +534,16 @@ const HomePage = () => {
           {searching && (
             <Box sx={{ mt: 2, textAlign: 'center', color: theme.colors.primary, fontWeight: 600 }}>Searching...</Box>
           )}
-          {!searching && searchResults.length > 0 && (
+          {!searching && filteredSearchResults.length > 0 && (
             <Box sx={{ mt: 2, maxWidth: 800, mx: 'auto', bgcolor: theme.colors.card, borderRadius: 2, boxShadow: '0 2px 8px rgba(0,0,0,0.08)', p: 2 }}>
-              {searchResults.map((item, idx) => (
+              {filteredSearchResults.map((item, idx) => (
                 <Box
                   key={item._id || idx}
                   sx={{
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    borderBottom: idx !== searchResults.length - 1 ? `1px solid ${theme.colors.border}` : 'none',
+                    borderBottom: idx !== filteredSearchResults.length - 1 ? `1px solid ${theme.colors.border}` : 'none',
                     py: 1,
                     cursor: 'pointer',
                     '&:hover': { background: `${theme.colors.primary}10` }
@@ -954,6 +972,7 @@ const HomePage = () => {
             </Box>
           </Box>
         </Container>
+        {/* Footer - Material UI */}
         
       </main>
       <Dialog open={showOrdersModal} onClose={() => setShowOrdersModal(false)} maxWidth="md" fullWidth>
