@@ -143,6 +143,7 @@ const SideMenu = ({
   const { savedAddresses, setSavedAddresses, selectedDeliveryAddress, setSelectedDeliveryAddress } = useDeliveryAddress();
   const navigate = useNavigate();
   const [snackbar, setSnackbar] = React.useState({ open: false, message: '', severity: 'warning' });
+  const [showAddressModal, setShowAddressModal] = React.useState(false);
 
   React.useEffect(() => {
     if (showSettingsModal) {
@@ -253,10 +254,10 @@ const SideMenu = ({
               </ListItemButton>
             </ListItem>
             <ListItem disablePadding>
-              <ListItemButton onClick={() => {
-                onClose();
-                openAddressModal();
-              }} sx={{ color: theme.colors.sidebarText }}>
+              <ListItemButton
+                onClick={() => setShowAddressModal(true)}
+                sx={{ color: theme.colors.sidebarText }}
+              >
                 <ListItemIcon sx={{ color: theme.colors.sidebarIcon }}>
                   <HomeIcon />
                 </ListItemIcon>
@@ -411,42 +412,6 @@ const SideMenu = ({
             </Typography>
             <ChevronRightIcon sx={{ color: theme.colors.secondaryText }} />
           </Box>
-          {savedAddresses.length === 0 ? (
-            <Typography>No saved addresses found.</Typography>
-          ) : (
-            savedAddresses.map((addr, idx) => (
-              <Box key={idx} sx={{ mb: 2, p: 2, border: '1px solid #eee', borderRadius: 2 }}>
-                <Typography sx={{ fontWeight: 600 }}>{addr.label || addr.type || 'Address'}</Typography>
-                <Typography sx={{ fontSize: 14 }}>{addr.formattedAddress || addr.address}</Typography>
-                <Button
-                  variant="contained"
-                  sx={{
-                    bgcolor: theme.colors.primary,
-                    color: theme.colors.buttonText || '#fff',
-                    borderRadius: 2,
-                    fontWeight: 500,
-                    fontSize: 14,
-                    py: 0.5,
-                    px: 2,
-                    minWidth: 70,
-                    boxShadow: 'none',
-                    mt: 1,
-                    '&:hover': { bgcolor: theme.colors.primary }
-                  }}
-                  onClick={async () => {
-                    console.log('Current:', selectedDeliveryAddress);
-                    console.log('New:', addr);
-                    await setSelectedDeliveryAddress(addr);
-                    setShowSettingsModal(false);
-                    if (onClose) onClose();
-                    setSnackbar({ open: true, message: 'Delivery address selected!', severity: 'success' });
-                  }}
-                >
-                  Deliver Here
-                </Button>
-              </Box>
-            ))
-          )}
         </DialogContent>
       </Dialog>
       {/* Logout Confirmation Modal */}
@@ -691,6 +656,72 @@ const SideMenu = ({
               </Accordion>
             ));
           })()}
+        </DialogContent>
+      </Dialog>
+      {/* Address Selection Modal (copied logic from Navbar) */}
+      <Dialog
+        open={showAddressModal}
+        onClose={() => setShowAddressModal(false)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{
+          sx: {
+            bgcolor: theme.colors.card,
+            color: theme.colors.text,
+            borderRadius: 2,
+            boxShadow: 1,
+          }
+        }}
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', bgcolor: theme.colors.card, color: theme.colors.text }}>
+          Select Delivery Address
+          <IconButton onClick={() => setShowAddressModal(false)}>
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ bgcolor: theme.colors.card, color: theme.colors.text }}>
+          {savedAddresses.length === 0 ? (
+            <Typography>No saved addresses found.</Typography>
+          ) : (
+            savedAddresses.map((addr, idx) => (
+              <Box key={idx} sx={{ mb: 2, p: 2, border: '1px solid #eee', borderRadius: 2 }}>
+                <Typography sx={{ fontWeight: 600 }}>{addr.label || addr.type || 'Address'}</Typography>
+                <Typography sx={{ fontSize: 14 }}>{addr.formattedAddress || addr.address}</Typography>
+                <Button
+                  variant="contained"
+                  sx={{
+                    bgcolor: theme.colors.primary,
+                    color: theme.colors.buttonText || '#fff',
+                    borderRadius: 2,
+                    fontWeight: 500,
+                    fontSize: 14,
+                    py: 0.5,
+                    px: 2,
+                    minWidth: 70,
+                    boxShadow: 'none',
+                    mt: 1,
+                    '&:hover': { bgcolor: theme.colors.primary }
+                  }}
+                  onClick={async () => {
+                    // Same logic as Navbar modal
+                    const addressToStore = {
+                      ...addr,
+                      coordinates: {
+                        latitude: addr.latitude || (addr.coordinates && addr.coordinates.latitude),
+                        longitude: addr.longitude || (addr.coordinates && addr.coordinates.longitude)
+                      }
+                    };
+                    await setSelectedDeliveryAddress(addressToStore);
+                    setShowAddressModal(false);
+                    if (onClose) onClose();
+                    setSnackbar({ open: true, message: 'Delivery address selected!', severity: 'success' });
+                  }}
+                >
+                  Deliver Here
+                </Button>
+              </Box>
+            ))
+          )}
         </DialogContent>
       </Dialog>
       <Snackbar

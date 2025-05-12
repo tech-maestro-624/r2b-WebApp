@@ -428,71 +428,63 @@ const Navbar = ({
                           fullWidth
                           PaperProps={{
                             sx: {
-                              bgcolor: theme.modal.background,
-                              color: theme.modal.text,
-                              borderRadius: theme.modal.borderRadius,
-                              boxShadow: theme.modal.boxShadow,
+                              bgcolor: theme.colors.card,
+                              color: theme.colors.text,
+                              borderRadius: 2,
+                              boxShadow: 1,
                             }
                           }}
                         >
-                          <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', bgcolor: theme.modal.background, color: theme.modal.text, minHeight: 0, py: 1, borderRadius: `${theme.modal.borderRadius}px ${theme.modal.borderRadius}px 0 0` }}>
-                            <IconButton onClick={() => setShowAddressModal(false)} size="large" sx={{ color: theme.modalCloseIcon.color }}>
+                          <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', bgcolor: theme.colors.card, color: theme.colors.text }}>
+                            Select Delivery Address
+                            <IconButton onClick={() => setShowAddressModal(false)}>
                               <CloseIcon />
                             </IconButton>
                           </DialogTitle>
-                          <DialogContent sx={{ bgcolor: theme.modal.background }}>
-                            <Typography variant="h6" sx={{ mb: 2, color: theme.modal.text, textAlign: 'center' }}>Saved Delivery Addresses</Typography>
+                          <DialogContent sx={{ bgcolor: theme.colors.card, color: theme.colors.text }}>
                             {savedAddresses.length === 0 ? (
-                              <Typography sx={{ color: theme.colors.secondaryText, textAlign: 'center' }}>No saved addresses found.</Typography>
+                              <Typography>No saved addresses found.</Typography>
                             ) : (
-                              <List>
-                                {savedAddresses.map((addr, idx) => (
-                                  <ListItem key={idx} sx={{ flexDirection: 'row', alignItems: 'center', mb: 1 }}
-                                    secondaryAction={
-                                      <Button
-                                        variant="contained"
-                                        sx={{
-                                          bgcolor: theme.modalButton.primary,
-                                          color: theme.modalButton.primaryText,
-                                          borderRadius: theme.modalButton.borderRadius,
-                                          fontWeight: 500,
-                                          fontSize: 14,
-                                          py: 0.5,
-                                          px: 2,
-                                          minWidth: 70,
-                                          boxShadow: 'none',
-                                          '&:hover': { bgcolor: theme.modalButton.primary }
-                                        }}
-                                        onClick={async () => {
-                                          setSelectedAddress(addr);
-                                          const addressToStore = {
-                                            ...addr,
-                                            coordinates: {
-                                              latitude: addr.latitude || (addr.coordinates && addr.coordinates.latitude),
-                                              longitude: addr.longitude || (addr.coordinates && addr.coordinates.longitude)
-                                            }
-                                          };
-                                          await locationService.storeSelectedAddress(addressToStore);
-                                          setSelectedDeliveryAddress(addressToStore);
-                                          setLocationAddress(addressToStore.formattedAddress || addressToStore.address);
-                                          setShowAddressModal(false);
-                                          setShowLocationModal(false); // Close both modals
-                                          setSnackbar({ open: true, message: 'Delivery address selected!', severity: 'success' });
-                                          window.dispatchEvent(new Event('addressChanged'));
-                                        }}
-                                      >
-                                        Deliver Here
-                                      </Button>
-                                    }
+                              savedAddresses.map((addr, idx) => (
+                                <Box key={idx} sx={{ mb: 2, p: 2, border: '1px solid #eee', borderRadius: 2 }}>
+                                  <Typography sx={{ fontWeight: 600 }}>{addr.label || addr.type || 'Address'}</Typography>
+                                  <Typography sx={{ fontSize: 14 }}>{addr.formattedAddress || addr.address}</Typography>
+                                  <Button
+                                    variant="contained"
+                                    sx={{
+                                      bgcolor: theme.colors.primary,
+                                      color: theme.colors.buttonText || '#fff',
+                                      borderRadius: 2,
+                                      fontWeight: 500,
+                                      fontSize: 14,
+                                      py: 0.5,
+                                      px: 2,
+                                      minWidth: 70,
+                                      boxShadow: 'none',
+                                      mt: 1,
+                                      '&:hover': { bgcolor: theme.colors.primary }
+                                    }}
+                                    onClick={async () => {
+                                      const addressToStore = {
+                                        ...addr,
+                                        coordinates: {
+                                          latitude: addr.latitude || (addr.coordinates && addr.coordinates.latitude),
+                                          longitude: addr.longitude || (addr.coordinates && addr.coordinates.longitude)
+                                        }
+                                      };
+                                      await setSelectedDeliveryAddress(addressToStore);
+                                      setShowAddressModal(false);
+                                      setShowLocationModal(false);
+                                      setShowDetectModal(false);
+                                      setShowSelectAddressModal(false);
+                                      setShowConfirmModal(false);
+                                      setSnackbar({ open: true, message: 'Delivery address selected!', severity: 'success' });
+                                    }}
                                   >
-                                    <Box sx={{ flex: 1 }}>
-                                      <Typography sx={{ fontWeight: 600, color: theme.modal.text }}>{addr.label || addr.type || 'Address'}</Typography>
-                                      <Typography sx={{ color: theme.colors.secondaryText, fontSize: 14 }}>{addr.formattedAddress || addr.address}</Typography>
-                                      {addr.pincode && <Typography sx={{ color: theme.colors.secondaryText, fontSize: 13 }}>Pincode: {addr.pincode}</Typography>}
-                                    </Box>
-                                  </ListItem>
-                                ))}
-                              </List>
+                                    Deliver Here
+                                  </Button>
+                                </Box>
+                              ))
                             )}
                           </DialogContent>
                         </Dialog>
