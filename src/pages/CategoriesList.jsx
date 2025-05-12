@@ -5,6 +5,7 @@ import { restaurantService } from '../services/restaurantService';
 import { locationService } from '../services/locationService';
 import { fileService } from '../services/fileService';
 import { ThemeContext } from '../context/ThemeContext.jsx';
+import { useDeliveryAddress } from '../context/DeliveryAddressContext';
 
 const CategoriesList = () => {
   const { categoryName: categoryNameParam } = useParams();
@@ -16,6 +17,7 @@ const CategoriesList = () => {
   const [displayCategoryName, setDisplayCategoryName] = useState('');
   const [coordinates, setCoordinates] = useState(null);
   const { theme } = React.useContext(ThemeContext);
+  const { selectedDeliveryAddress } = useDeliveryAddress();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -45,7 +47,7 @@ const CategoriesList = () => {
         }
 
         // 1. Get user location
-        let locCoords = location.state?.coordinates || null;
+        let locCoords = selectedDeliveryAddress?.coordinates || location.state?.coordinates || null;
         if (!locCoords) {
           const loc = await locationService.getCurrentLocation();
           locCoords = loc?.coordinates || null;
@@ -131,7 +133,7 @@ const CategoriesList = () => {
       }
     };
     fetchData();
-  }, [categoryNameParam]);
+  }, [categoryNameParam, selectedDeliveryAddress]);
 
   if (loading) {
     return (
@@ -158,7 +160,7 @@ const CategoriesList = () => {
         minHeight: '100vh',
         background: theme.colors.background,
         padding: '4px',
-        fontFamily: 'Poppins, Arial, sans-serif',
+        fontFamily: 'Trebuchet MS, Arial, sans-serif',
       }}
     >
       {/* Appetizer/Category Heading */}
@@ -288,7 +290,7 @@ const CategoriesList = () => {
                   )}
                   <Box sx={{ p: 2, pt: 1.5, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1, width: '100%' }}>
-                      <Typography sx={{ fontSize: 20, fontWeight: 700, flex: 1, color: theme.colors.text, fontFamily: 'Poppins, Arial, sans-serif', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'center' }}>{rest.name}</Typography>
+                      <Typography sx={{ fontSize: 20, fontWeight: 700, flex: 1, color: theme.colors.text, fontFamily: 'Trebuchet MS, Arial, sans-serif', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'center' }}>{rest.name}</Typography>
                       <Box sx={{ ml: 1, px: 1, py: 0.25, bgcolor: theme.colors.success, color: '#fff', borderRadius: 2, fontWeight: 600, fontSize: 15, display: 'flex', alignItems: 'center', minWidth: 36, justifyContent: 'center' }}>
                         <span style={{ fontWeight: 700 }}>{rest.rating || 0}</span>
                       </Box>

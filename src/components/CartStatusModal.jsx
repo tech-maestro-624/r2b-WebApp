@@ -662,16 +662,29 @@ const CartStatusModal = ({ open, onClose, cartItems = [], handleQuantityChange, 
         onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <Alert 
-          onClose={handleCloseSnackbar} 
+        <Alert
+          onClose={handleCloseSnackbar}
           severity={snackbar.severity}
-          sx={{ 
+          icon={snackbar.severity === 'success' ? <CheckCircleIcon sx={{ fontSize: 28, mr: 1, color: '#fff' }} /> : undefined}
+          sx={{
             width: '100%',
-            bgcolor: theme.colors.card,
-            color: theme.colors.text,
+            bgcolor: snackbar.severity === 'success' ? '#219653' : theme.colors.card,
+            color: snackbar.severity === 'success' ? '#fff' : theme.colors.text,
+            borderRadius: 2.5,
+            fontWeight: 400,
+            fontSize: 16,
+            minWidth: 280,
+            px: 2,
+            py: 1,
+            boxShadow: '0 6px 32px rgba(0,0,0,0.13)',
+            alignItems: 'center',
+            display: 'flex',
+            justifyContent: 'center',
+            fontFamily: 'Poppins, Arial, sans-serif',
+            border: snackbar.severity === 'success' ? 'none' : `2px solid ${theme.colors.primary}`,
             '& .MuiAlert-icon': {
-              color: snackbar.severity === 'success' ? theme.colors.success : theme.colors.warning
-            }
+              color: '#fff',
+            },
           }}
         >
           {snackbar.message}

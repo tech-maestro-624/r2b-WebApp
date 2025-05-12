@@ -32,6 +32,8 @@ import MenuItem from '@mui/material/MenuItem';
 import FormControl from '@mui/material/FormControl';
 import CircularProgress from '@mui/material/CircularProgress';
 import OutlinedInput from '@mui/material/OutlinedInput';
+import { Helmet } from 'react-helmet';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
 function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
   const R = 6371; // Radius of the earth in km
@@ -421,657 +423,759 @@ console.log('branch',branch);
     return aAvailable ? -1 : 1;
   });
 
+  const seoTitle = branch && restaurant ? `${branch.name} | ${restaurant.name} | Menu, Reviews & Delivery | Roll2Bowl` : 'Restaurant | Roll2Bowl';
+  const seoDescription = branch && restaurant ? `Order from ${branch.name}, ${restaurant.name} on Roll2Bowl. View menu, reviews, delivery info, and enjoy fast food delivery in your area.` : 'Order from top restaurants on Roll2Bowl. View menu, reviews, and enjoy fast food delivery.';
+  const canonicalUrl = typeof window !== "undefined"
+    ? window.location.origin + window.location.pathname
+    : "https://www.roll2bowl.com/";
+  const businessStructuredData = branch && restaurant ? {
+    '@context': 'https://schema.org',
+    '@type': 'Restaurant',
+    name: branch.name,
+    servesCuisine: restaurant.tags || [],
+    url: canonicalUrl,
+    image: branch.restaurant?.image || 'https://www.roll2bowl.com/og-image.jpg',
+    address: {
+      '@type': 'PostalAddress',
+      streetAddress: branch.address || '',
+      addressLocality: branch.city || '',
+      addressRegion: 'Karnataka',
+      postalCode: branch.pincode || '',
+      addressCountry: 'IN'
+    },
+    telephone: restaurant.phone || '',
+    aggregateRating: {
+      '@type': 'AggregateRating',
+      ratingValue: restaurant.rating || '4.0',
+      reviewCount: restaurant.reviewCount || '0'
+    },
+    menu: canonicalUrl + '#menu',
+    priceRange: restaurant.priceRange || '$$',
+    aggregateOffer: {
+      '@type': 'AggregateOffer',
+      lowPrice: restaurant.menuLowPrice || '99',
+      highPrice: restaurant.menuHighPrice || '999',
+      priceCurrency: 'INR',
+      offerCount: Array.isArray(menuRes) ? menuRes.length : 10
+    },
+    hasMenu: canonicalUrl + '#menu',
+    offersDelivery: true,
+    acceptsReservations: false
+  } : null;
+  const breadcrumbStructuredData = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    'itemListElement': [
+      {
+        '@type': 'ListItem',
+        position: 1,
+        name: 'Home',
+        item: 'https://www.roll2bowl.com/'
+      },
+      {
+        '@type': 'ListItem',
+        position: 2,
+        name: restaurant ? restaurant.name : 'Restaurant',
+        item: canonicalUrl
+      }
+    ]
+  };
+
   return (
-    <Box
-      sx={{
-        minHeight: '100vh',
-        width: '100vw',
-        bgcolor: theme.colors.background,
-        color: theme.colors.text,
-        transition: 'background 0.3s, color 0.3s',
-        fontFamily: 'Poppins, Arial, sans-serif',
-        py: 2,
-      }}
-    >
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, maxWidth: 1500, mx: 'auto', my: 2 }}>
-        {/* Restaurant Details Card */}
-        <Card sx={{ width: 1400, mx: 'auto', p: 2, boxShadow: 1, background: theme.colors.card, color: theme.colors.text }}>
-          <CardContent>
-            <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: 4 }}>
-              {/* Left: Details */}
-              <Box sx={{ flex: 1 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-                  <Typography variant="h4" sx={{ fontWeight: 700, color: theme.colors.text, fontFamily: theme.typography.fontFamily.bold, fontSize: { xs: '1.2rem', sm: '1.5rem', md: '1.7rem', lg: '2rem' } }}>
-                    {branch ? `${branch.name} (${calculateDistance(branch.location)} km)` : 'Branch'}
-                </Typography>
-                </Box>
-                <Typography variant="body2" sx={{ mb: 1, color: theme.colors.secondaryText }}>
-                  {branch ? branch.address : 'No address available'}
-                </Typography>
-                {branch && branch.city && (
-                  <Typography variant="body2" sx={{ mb: 1, color: theme.colors.secondaryText }}>
-                    {branch.city}
+    <>
+      <Helmet>
+        {/* Preconnect and preload for performance */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        {branchRestaurantImage && <link rel="preload" as="image" href={branchRestaurantImage} />}
+        <title>{seoTitle}</title>
+        <meta name="description" content={seoDescription} />
+        <link rel="canonical" href={canonicalUrl} />
+        {/* Open Graph tags */}
+        <meta property="og:title" content={seoTitle} />
+        <meta property="og:description" content={seoDescription} />
+        <meta property="og:type" content="restaurant" />
+        <meta property="og:url" content={canonicalUrl} />
+        <meta property="og:image" content={branch && branch.restaurant?.image ? branch.restaurant.image : 'https://www.roll2bowl.com/og-image.jpg'} />
+        {/* Twitter Card tags */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={seoTitle} />
+        <meta name="twitter:description" content={seoDescription} />
+        <meta name="twitter:image" content={branch && branch.restaurant?.image ? branch.restaurant.image : 'https://www.roll2bowl.com/og-image.jpg'} />
+        {/* Structured Data */}
+        {businessStructuredData && <script type="application/ld+json">{JSON.stringify(businessStructuredData)}</script>}
+        <script type="application/ld+json">{JSON.stringify(breadcrumbStructuredData)}</script>
+      </Helmet>
+      {/* Accessible skip-to-menu link: visually hidden but focusable */}
+      <a href="#menu-section" style={{position:'absolute',left:'-9999px',height:'1px',width:'1px',overflow:'hidden'}} tabIndex={0} onFocus={e => {e.target.style.position='static';e.target.style.height='auto';e.target.style.width='auto';e.target.style.overflow='visible';}} onBlur={e => {e.target.style.position='absolute';e.target.style.left='-9999px';e.target.style.height='1px';e.target.style.width='1px';e.target.style.overflow='hidden';}}>Skip to Menu</a>
+      {/* Visually hidden SEO heading and paragraph */}
+      <h1 style={{position:'absolute',left:'-9999px',height:'1px',width:'1px',overflow:'hidden'}}>{seoTitle}</h1>
+      <p style={{position:'absolute',left:'-9999px',height:'1px',width:'1px',overflow:'hidden'}}>{seoDescription}</p>
+      {/* Visually hidden h2 for Menu section */}
+      <h2 id="menu-section" style={{position:'absolute',left:'-9999px',height:'1px',width:'1px',overflow:'hidden'}}>Menu</h2>
+      <Box
+        sx={{
+          minHeight: '100vh',
+          width: '100vw',
+          bgcolor: theme.colors.background,
+          color: theme.colors.text,
+          transition: 'background 0.3s, color 0.3s',
+          fontFamily: 'Trebuchet MS, Arial, sans-serif',
+          py: 2,
+        }}
+      >
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, maxWidth: 1500, mx: 'auto', my: 2 }}>
+          {/* Restaurant Details Card */}
+          <Card sx={{ width: 1400, mx: 'auto', p: 2, boxShadow: 1, background: theme.colors.card, color: theme.colors.text }}>
+            <CardContent>
+              <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: 4 }}>
+                {/* Left: Details */}
+                <Box sx={{ flex: 1 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+                    <Typography variant="h4" sx={{ fontWeight: 700, color: theme.colors.text, fontFamily: theme.typography.fontFamily.bold, fontSize: { xs: '1.2rem', sm: '1.5rem', md: '1.7rem', lg: '2rem' } }}>
+                      {branch ? `${branch.name} (${calculateDistance(branch.location)} km)` : 'Branch'}
                   </Typography>
-                )}
-                {/* Tags */}
-                {Array.isArray(restaurant?.tags) && restaurant.tags.length > 0 && (
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1 }}>
-                    {restaurant.tags.map((tag, idx) => (
-                      <Box key={idx} sx={{ bgcolor: theme.colors.inputBackground, borderRadius: theme.borderRadius.small, px: 1.5, py: 0.5, mr: 1, mb: 1 }}>
-                        <Typography variant="caption" sx={{ color: theme.colors.secondaryText }}>{tag}</Typography>
-                      </Box>
-                    ))}
                   </Box>
-                )}
-                {/* Delivery Info */}
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-                  <Typography variant="body2" sx={{ color: theme.colors.secondaryText }}>
-                    :motor_scooter: {restaurant?.deliveryFee ? `₹${restaurant.deliveryFee}` : 'Free Delivery'}
+                  <Typography variant="body2" sx={{ mb: 1, color: theme.colors.secondaryText }}>
+                    {branch ? branch.address : 'No address available'}
                   </Typography>
-                  <Typography variant="body2" sx={{ color: theme.colors.secondaryText }}>
-                    :stopwatch: {restaurant?.deliveryTime || '30-45 mins'}
-                  </Typography>
-                </Box>
-                {/* Rating */}
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Typography variant="body2" sx={{ color: theme.colors.secondaryText }}>:star:</Typography>
-                  <Typography variant="body2" sx={{ color: theme.colors.secondaryText }}>
-                    {restaurant?.rating || 4.0} ({restaurant?.reviewCount || 0}+)
-                  </Typography>
-                </Box>
-                {Array.isArray(restaurant?.branches) && restaurant.branches.length > 1 && (
-                  <Box sx={{ display: 'flex', justifyContent: 'flex-start', mt: 3, width: '100%' }}>
-                    <FormControl
-                      size="small"
-                      variant="outlined"
-                      sx={{
-                        minWidth: 220,
-                        background: theme.colors.inputBackground,
-                      }}
-                    >
-                      <Select
-                        value={selectedOutlet || ''}
-                        onChange={handleOutletChange}
-                        displayEmpty
-                        input={<OutlinedInput notched label="" />}
+                  {branch && branch.city && (
+                    <Typography variant="body2" sx={{ mb: 1, color: theme.colors.secondaryText }}>
+                      {branch.city}
+                    </Typography>
+                  )}
+                  {/* Tags */}
+                  {Array.isArray(restaurant?.tags) && restaurant.tags.length > 0 && (
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1 }}>
+                      {restaurant.tags.map((tag, idx) => (
+                        <Box key={idx} sx={{ bgcolor: theme.colors.inputBackground, borderRadius: theme.borderRadius.small, px: 1.5, py: 0.5, mr: 1, mb: 1 }}>
+                          <Typography variant="caption" sx={{ color: theme.colors.secondaryText }}>{tag}</Typography>
+                        </Box>
+                      ))}
+                    </Box>
+                  )}
+                  {/* Delivery Info */}
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+                    <Typography variant="body2" sx={{ color: theme.colors.secondaryText }}>
+                      :motor_scooter: {restaurant?.deliveryFee ? `₹${restaurant.deliveryFee}` : 'Free Delivery'}
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: theme.colors.secondaryText }}>
+                      :stopwatch: {restaurant?.deliveryTime || '30-45 mins'}
+                    </Typography>
+                  </Box>
+                  {/* Rating */}
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Typography variant="body2" sx={{ color: theme.colors.secondaryText }}>:star:</Typography>
+                    <Typography variant="body2" sx={{ color: theme.colors.secondaryText }}>
+                      {restaurant?.rating || 4.0} ({restaurant?.reviewCount || 0}+)
+                    </Typography>
+                  </Box>
+                  {Array.isArray(restaurant?.branches) && restaurant.branches.length > 1 && (
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-start', mt: 3, width: '100%' }}>
+                      <FormControl
+                        size="small"
+                        variant="outlined"
                         sx={{
-                          bgcolor: 'transparent',
-                          color: theme.colors.text,
-                          height: 40,
-                          boxShadow: 'none',
-                          '& .MuiOutlinedInput-notchedOutline': {
-                            border: '1.5px solid #FF5A33',
-                          },
-                          '&:hover .MuiOutlinedInput-notchedOutline': {
-                            border: '1.5px solid #FF5A33',
-                          },
-                          '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                            border: '1.5px solid #FF5A33',
-                          },
-                          '& .MuiSelect-icon': {
-                            color: theme.colors.primary,
-                          },
-                          '& .MuiSelect-select': {
-                            fontFamily: theme.typography.fontFamily.medium,
-                            fontSize: '0.95rem',
-                            padding: '8px 14px',
-                          },
+                          minWidth: 220,
+                          background: theme.colors.inputBackground,
                         }}
-                        MenuProps={{
-                          PaperProps: {
-                            sx: {
-                              bgcolor: theme.colors.card,
-                              color: theme.colors.text,
-                              mt: 1,
-                              boxShadow: theme.modal.boxShadow,
-                              '& .MuiMenuItem-root': {
-                                fontFamily: theme.typography.fontFamily.regular,
-                                fontSize: '0.95rem',
-                                padding: '10px 16px',
-                                '&:hover': {
-                                  bgcolor: `${theme.colors.primary}10`,
-                                },
-                                '&.Mui-selected': {
-                                  bgcolor: `${theme.colors.primary}20`,
+                      >
+                        <Select
+                          value={selectedOutlet || ''}
+                          onChange={handleOutletChange}
+                          displayEmpty
+                          input={<OutlinedInput notched label="" />}
+                          sx={{
+                            bgcolor: 'transparent',
+                            color: theme.colors.text,
+                            height: 40,
+                            boxShadow: 'none',
+                            '& .MuiOutlinedInput-notchedOutline': {
+                              border: '1.5px solid #FF5A33',
+                            },
+                            '&:hover .MuiOutlinedInput-notchedOutline': {
+                              border: '1.5px solid #FF5A33',
+                            },
+                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                              border: '1.5px solid #FF5A33',
+                            },
+                            '& .MuiSelect-icon': {
+                              color: theme.colors.primary,
+                            },
+                            '& .MuiSelect-select': {
+                              fontFamily: theme.typography.fontFamily.medium,
+                              fontSize: '0.95rem',
+                              padding: '8px 14px',
+                            },
+                          }}
+                          MenuProps={{
+                            PaperProps: {
+                              sx: {
+                                bgcolor: theme.colors.card,
+                                color: theme.colors.text,
+                                mt: 1,
+                                boxShadow: theme.modal.boxShadow,
+                                '& .MuiMenuItem-root': {
+                                  fontFamily: theme.typography.fontFamily.regular,
+                                  fontSize: '0.95rem',
+                                  padding: '10px 16px',
                                   '&:hover': {
-                                    bgcolor: `${theme.colors.primary}30`,
+                                    bgcolor: `${theme.colors.primary}10`,
+                                  },
+                                  '&.Mui-selected': {
+                                    bgcolor: `${theme.colors.primary}20`,
+                                    '&:hover': {
+                                      bgcolor: `${theme.colors.primary}30`,
+                                    },
                                   },
                                 },
                               },
                             },
-                          },
-                        }}
-                      >
-                        <MenuItem value="" disabled>
-                          <em>Select an Outlet</em>
-                        </MenuItem>
-                        {branchDetails.map((branch) => {
-                          const distance = calculateDistance(branch.location);
-                          const isNonServiceable =
-                            distance && branch.serviceableDistance && parseFloat(distance) > parseFloat(branch.serviceableDistance);
-
-                          return (
-                            <MenuItem
-                              key={branch._id}
-                              value={branch._id}
-                              disabled={isNonServiceable}
-                              sx={{
-                                opacity: isNonServiceable ? 0.5 : 1,
-                                pointerEvents: isNonServiceable ? 'none' : 'auto',
-                                color: isNonServiceable ? theme.colors.secondaryText : theme.colors.text,
-                                '&:hover': {
-                                  bgcolor: isNonServiceable ? 'transparent' : `${theme.colors.primary}10`,
-                                },
-                              }}
-                            >
-                              <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
-                                <Typography sx={{ 
-                                  fontFamily: theme.typography.fontFamily.medium,
-                                  fontSize: '0.95rem',
-                                }}>
-                                  {branch.name}
-                                </Typography>
-                                <Typography sx={{ 
-                                  color: isNonServiceable ? theme.colors.error : theme.colors.secondaryText,
-                                  fontSize: '0.85rem',
-                                  ml: 2,
-                                  fontFamily: theme.typography.fontFamily.regular,
-                                }}>
-                                  {distance ? `${distance} km` : ''}
-                                  {isNonServiceable && ' (Not Serviceable)'}
-                                </Typography>
-                              </Box>
-                            </MenuItem>
-                          );
-                        })}
-                      </Select>
-                    </FormControl>
-                  </Box>
-                )}
-              </Box>
-              {/* Right: Restaurant Image from branch.restaurant.image */}
-              {branchRestaurantImage && (
-                <CardMedia
-                  component="img"
-                  image={branchRestaurantImage}
-                  alt={branch.restaurant?.name || 'Restaurant'}
-                  sx={{ width: 320, height: 220, objectFit: 'cover', ml: 2 }}
-                />
-              )}
-            </Box>
-          </CardContent>
-        </Card>
-
-        {/* Food Menu Card */}
-        <Card sx={{ width: 1400, mx: 'auto', p: 2, boxShadow: 'none', background: theme.colors.background, color: theme.colors.text }}>
-          <CardContent>
-            <Typography variant="h5" sx={{ fontWeight: 600, mb: 2, textAlign: 'center', color: theme.colors.text, fontFamily: theme.typography.fontFamily.bold }}>Menu</Typography>
-
-            {/* Dynamic Category Tabs from menuRes */}
-            <Box sx={{ mb: 3, display: 'flex', justifyContent: 'center' }}>
-              <Tabs
-                value={categoryNames.indexOf(selectedCategory)}
-                onChange={(_, newValue) => setSelectedCategory(categoryNames[newValue])}
-                aria-label="food category tabs"
-                variant="scrollable"
-                scrollButtons="auto"
-                sx={{ mx: 'auto' }}
-              >
-                {categoryNames.map((cat, idx) => (
-                  <Tab 
-                    key={cat} 
-                    label={cat} 
-                    sx={{ 
-                      px: 4, 
-                      color: theme.colors.text, 
-                      fontFamily: theme.typography.fontFamily.medium,
-                      '&.Mui-selected': {
-                        color: theme.colors.primary,
-                        fontWeight: 600
-                      }
-                    }} 
-                  />
-                ))}
-              </Tabs>
-            </Box>
-
-            {/* Dynamic Menu Grid for selected category */}
-            <Box sx={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(3, 1fr)', 
-              gap: 2,
-              mb: 2
-            }}>
-              {sortedItems.slice(0, 9).map((item, idx) => {
-                console.log('Food item:', item);
-                // If item has variants, set price to first variant's price
-                let displayItem = { ...item };
-                if (displayItem.hasVariants && Array.isArray(displayItem.variants) && displayItem.variants.length > 0) {
-                  displayItem.price = displayItem.variants[0].price;
-                }
-                // Find quantity in cart
-                const cartItem = cartItems.find(ci => ci._id === displayItem._id);
-                const quantity = cartItem ? cartItem.quantity : 0;
-                // Check if branch is non-serviceable
-                let isNonServiceable = false;
-                if (branch && branch.location && branch.serviceableDistance) {
-                  const distance = calculateDistance(branch.location);
-                  if (distance && parseFloat(distance) > parseFloat(branch.serviceableDistance)) {
-                    isNonServiceable = true;
-                  }
-                }
-                return (
-                  <Card
-                    key={displayItem._id || idx}
-                    sx={{
-                      p: 1.5,
-                      display: 'flex',
-                      flexDirection: 'row',
-                      alignItems: 'stretch',
-                      boxShadow: 2,
-                      background: !displayItem.isAvailable ? `${theme.colors.card}80` : theme.colors.card,
-                      color: theme.colors.text,
-                      minWidth: 420,
-                      mb: 1,
-                      opacity: !displayItem.isAvailable ? 0.7 : 1,
-                      pointerEvents: !displayItem.isAvailable ? 'none' : 'auto',
-                    }}
-                  >
-                    <CardMedia
-                      component="img"
-                      image={displayItem.image || 'https://via.placeholder.com/120'}
-                      alt={displayItem.name}
-                      sx={{ 
-                        width: 135,
-                        height: 135,
-                        objectFit: 'cover', 
-                        border: '1px solid #e0e0e0', 
-                        borderRadius: 2, 
-                        mr: 2, 
-                        alignSelf: 'center' 
-                      }}
-                    />
-                    <Box sx={{ flex: 1, minWidth: 240, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                      <CardContent sx={{ p: 0, pb: 1, flex: 1 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                          <Typography
-                            sx={{
-                              fontWeight: 600,
-                              fontSize: 16,
-                              color: theme.colors.text,
-                              whiteSpace: 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              maxWidth: 180,
-                              lineHeight: 1,
-                            }}
-                            noWrap
-                          >
-                            {displayItem.name}
-                          </Typography>
-                          {/* Veg/Non-Veg Icon at end of title */}
-                          {displayItem.dishType && (
-                            <Box
-                              sx={{
-                                width: 20,
-                                height: 20,
-                                border: '2px solid',
-                                borderColor: displayItem.dishType === 'veg' ? '#43a047' : '#e53935',
-                                borderRadius: 0,
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                background: '#fff',
-                                boxSizing: 'border-box',
-                                ml: 1
-                              }}
-                            >
-                              <Box
-                                sx={{
-                                  width: 12,
-                                  height: 12,
-                                  borderRadius: '50%',
-                                  background: displayItem.dishType === 'veg' ? '#43a047' : '#e53935',
-                                }}
-                              />
-                            </Box>
-                          )}
-                        </Box>
-                        <Typography
-                          sx={{
-                            color: theme.colors.secondaryText,
-                            fontSize: 14,
-                            mb: 1,
-                            whiteSpace: 'normal',
-                            overflow: 'visible',
-                            textOverflow: 'unset',
                           }}
                         >
-                          {displayItem.description || 'No description.'}
-                        </Typography>
-                        <Typography sx={{ color: theme.colors.primary, fontWeight: 600, fontSize: 15, mb: 0.5, mt: 1 }}>₹{displayItem.price}</Typography>
-                      </CardContent>
-                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2, mt: 0 }}>
-                        {quantity > 0 ? (
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                            <IconButton 
-                              size="small" 
-                              sx={{ color: theme.colors.primary }} 
-                              onClick={() => handleQuantityChange(displayItem._id, -1)}
-                              disabled={isNonServiceable}
-                            >
-                              <RemoveIcon />
-                            </IconButton>
-                            <Typography sx={{ minWidth: 24, textAlign: 'center', fontWeight: 600, color: theme.colors.text }}>
-                              {quantity}
-                            </Typography>
-                            <IconButton 
-                              size="small" 
-                              sx={{ color: theme.colors.primary }} 
-                              onClick={() => handleQuantityChange(displayItem._id, 1)}
-                              disabled={isNonServiceable}
-                            >
-                              <AddIcon />
-                            </IconButton>
-                          </Box>
-                        ) : (
-                          <button
-                            style={{
-                              background: isNonServiceable ? theme.colors.secondaryText : (!displayItem.isAvailable ? theme.colors.secondaryText : theme.colors.primary),
-                              color: theme.colors.buttonText,
-                              border: 'none',
-                              borderRadius: theme.borderRadius.small,
-                              padding: '6px 18px',
-                              fontWeight: 600,
-                              cursor: isNonServiceable || !displayItem.isAvailable ? 'not-allowed' : 'pointer',
-                              marginTop: 0,
-                              opacity: isNonServiceable ? 0.7 : 1
-                            }}
-                            onClick={() => {
-                              if (!isNonServiceable && displayItem.isAvailable) handleAddToCartClick(displayItem);
-                            }}
-                            disabled={isNonServiceable || !displayItem.isAvailable}
-                          >
-                            {isNonServiceable ? 'Not Serviceable' : (displayItem.isAvailable ? 'Add to Cart' : 'Out Of Stock')}
-                          </button>
-                        )}
-                      </Box>
+                          <MenuItem value="" disabled>
+                            <em>Select an Outlet</em>
+                          </MenuItem>
+                          {branchDetails.map((branch) => {
+                            const distance = calculateDistance(branch.location);
+                            const isNonServiceable =
+                              distance && branch.serviceableDistance && parseFloat(distance) > parseFloat(branch.serviceableDistance);
+
+                            return (
+                              <MenuItem
+                                key={branch._id}
+                                value={branch._id}
+                                disabled={isNonServiceable}
+                                sx={{
+                                  opacity: isNonServiceable ? 0.5 : 1,
+                                  pointerEvents: isNonServiceable ? 'none' : 'auto',
+                                  color: isNonServiceable ? theme.colors.secondaryText : theme.colors.text,
+                                  '&:hover': {
+                                    bgcolor: isNonServiceable ? 'transparent' : `${theme.colors.primary}10`,
+                                  },
+                                }}
+                              >
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+                                  <Typography sx={{ 
+                                    fontFamily: theme.typography.fontFamily.medium,
+                                    fontSize: '0.95rem',
+                                  }}>
+                                    {branch.name}
+                                  </Typography>
+                                  <Typography sx={{ 
+                                    color: isNonServiceable ? theme.colors.error : theme.colors.secondaryText,
+                                    fontSize: '0.85rem',
+                                    ml: 2,
+                                    fontFamily: theme.typography.fontFamily.regular,
+                                  }}>
+                                    {distance ? `${distance} km` : ''}
+                                    {isNonServiceable && ' (Not Serviceable)'}
+                                  </Typography>
+                                </Box>
+                              </MenuItem>
+                            );
+                          })}
+                        </Select>
+                      </FormControl>
                     </Box>
-                  </Card>
-                );
-              })}
-            </Box>
-            {cartWarning && (
-              <Box sx={{
-                position: 'fixed',
-                bottom: 20,
-                left: '50%',
-                transform: 'translateX(-50%)',
-                bgcolor: theme.colors.card,
-                color: theme.colors.error,
-                px: 3,
-                py: 1,
-                borderRadius: 2,
-                boxShadow: 4,
-                zIndex: 2001
-              }}>
-                <Typography>{cartWarning}</Typography>
-              </Box>
-            )}
-            <Modal open={cartConflictOpen} onClose={() => setCartConflictOpen(false)}>
-              <Box
-                sx={{
-                  position: 'absolute',
-                  top: '50%',
-                  left: '50%',
-                  transform: 'translate(-50%, -50%)',
-                  width: 350,
-                  bgcolor: theme.modal.background,
-                  color: theme.modal.text,
-                  borderRadius: theme.modal.borderRadius,
-                  boxShadow: theme.modal.boxShadow,
-                  p: 4,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: 2,
-                }}
-              >
-                <Typography id="cart-conflict-title" variant="h6" sx={{ mb: 2, textAlign: 'center', color: theme.modal.text }}>
-                  You have items in your cart from another outlet.
-                </Typography>
-                <Typography id="cart-conflict-description" sx={{ mb: 3, textAlign: 'center', color: theme.modal.text }}>
-                  Would you like to clear your cart and add items from this outlet?
-                </Typography>
-                <Box sx={{ display: 'flex', gap: 2, width: '100%', justifyContent: 'center' }}>
-                  <Button
-                    variant="contained"
-                    sx={{ bgcolor: theme.modalButton.primary, color: theme.modalButton.primaryText, borderRadius: theme.modalButton.borderRadius, fontWeight: 600 }}
-                    onClick={() => handleCartConflict(true)}
-                  >
-                    Clear Cart & Continue
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    sx={{ color: theme.modalButton.secondaryText, borderColor: theme.modalButton.border, borderRadius: theme.modalButton.borderRadius, fontWeight: 600 }}
-                    onClick={() => handleCartConflict(false)}
-                  >
-                    Keep Current Cart
-                  </Button>
+                  )}
                 </Box>
+                {/* Right: Restaurant Image from branch.restaurant.image */}
+                {branchRestaurantImage && (
+                  <CardMedia
+                    component="img"
+                    image={branchRestaurantImage}
+                    alt={branch.restaurant?.name || 'Restaurant'}
+                    sx={{ width: 320, height: 220, objectFit: 'cover', ml: 2 }}
+                  />
+                )}
               </Box>
-            </Modal>
-            {cartItems.length > 0 && (
-              <Box
-                sx={{
+            </CardContent>
+          </Card>
+
+          {/* Food Menu Card */}
+          <Card sx={{ width: 1400, mx: 'auto', p: 2, boxShadow: 'none', background: theme.colors.background, color: theme.colors.text }}>
+            <CardContent>
+              <Typography variant="h5" sx={{ fontWeight: 600, mb: 2, textAlign: 'center', color: theme.colors.text, fontFamily: theme.typography.fontFamily.bold }}>Menu</Typography>
+
+              {/* Dynamic Category Tabs from menuRes */}
+              <Box sx={{ mb: 3, display: 'flex', justifyContent: 'center' }}>
+                <Tabs
+                  value={categoryNames.indexOf(selectedCategory)}
+                  onChange={(_, newValue) => setSelectedCategory(categoryNames[newValue])}
+                  aria-label="food category tabs"
+                  variant="scrollable"
+                  scrollButtons="auto"
+                  sx={{ mx: 'auto' }}
+                >
+                  {categoryNames.map((cat, idx) => (
+                    <Tab 
+                      key={cat} 
+                      label={cat} 
+                      sx={{ 
+                        px: 4, 
+                        color: theme.colors.text, 
+                        fontFamily: theme.typography.fontFamily.medium,
+                        '&.Mui-selected': {
+                          color: theme.colors.primary,
+                          fontWeight: 600
+                        }
+                      }} 
+                    />
+                  ))}
+                </Tabs>
+              </Box>
+
+              {/* Dynamic Menu Grid for selected category */}
+              <Box sx={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(3, 1fr)', 
+                gap: 2,
+                mb: 2
+              }}>
+                {sortedItems.slice(0, 9).map((item, idx) => {
+                  console.log('Food item:', item);
+                  // If item has variants, set price to first variant's price
+                  let displayItem = { ...item };
+                  if (displayItem.hasVariants && Array.isArray(displayItem.variants) && displayItem.variants.length > 0) {
+                    displayItem.price = displayItem.variants[0].price;
+                  }
+                  // Find quantity in cart
+                  const cartItem = cartItems.find(ci => ci._id === displayItem._id);
+                  const quantity = cartItem ? cartItem.quantity : 0;
+                  // Check if branch is non-serviceable
+                  let isNonServiceable = false;
+                  if (branch && branch.location && branch.serviceableDistance) {
+                    const distance = calculateDistance(branch.location);
+                    if (distance && parseFloat(distance) > parseFloat(branch.serviceableDistance)) {
+                      isNonServiceable = true;
+                    }
+                  }
+                  return (
+                    <Card
+                      key={displayItem._id || idx}
+                      sx={{
+                        p: 1.5,
+                        display: 'flex',
+                        flexDirection: 'row',
+                        alignItems: 'stretch',
+                        boxShadow: 2,
+                        background: !displayItem.isAvailable ? `${theme.colors.card}80` : theme.colors.card,
+                        color: theme.colors.text,
+                        minWidth: 420,
+                        mb: 1,
+                        opacity: !displayItem.isAvailable ? 0.7 : 1,
+                        pointerEvents: !displayItem.isAvailable ? 'none' : 'auto',
+                      }}
+                    >
+                      <CardMedia
+                        component="img"
+                        image={displayItem.image || 'https://via.placeholder.com/120'}
+                        alt={displayItem.name}
+                        sx={{ 
+                          width: 135,
+                          height: 135,
+                          objectFit: 'cover', 
+                          border: '1px solid #e0e0e0', 
+                          borderRadius: 2, 
+                          mr: 2, 
+                          alignSelf: 'center' 
+                        }}
+                      />
+                      <Box sx={{ flex: 1, minWidth: 240, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                        <CardContent sx={{ p: 0, pb: 1, flex: 1 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                            <Typography
+                              sx={{
+                                fontWeight: 600,
+                                fontSize: 16,
+                                color: theme.colors.text,
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                maxWidth: 180,
+                                lineHeight: 1,
+                              }}
+                              noWrap
+                            >
+                              {displayItem.name}
+                            </Typography>
+                            {/* Veg/Non-Veg Icon at end of title */}
+                            {displayItem.dishType && (
+                              <Box
+                                sx={{
+                                  width: 20,
+                                  height: 20,
+                                  border: '2px solid',
+                                  borderColor: displayItem.dishType === 'veg' ? '#43a047' : '#e53935',
+                                  borderRadius: 0,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  background: '#fff',
+                                  boxSizing: 'border-box',
+                                  ml: 1
+                                }}
+                              >
+                                <Box
+                                  sx={{
+                                    width: 12,
+                                    height: 12,
+                                    borderRadius: '50%',
+                                    background: displayItem.dishType === 'veg' ? '#43a047' : '#e53935',
+                                  }}
+                                />
+                              </Box>
+                            )}
+                          </Box>
+                          <Typography
+                            sx={{
+                              color: theme.colors.secondaryText,
+                              fontSize: 14,
+                              mb: 1,
+                              whiteSpace: 'normal',
+                              overflow: 'visible',
+                              textOverflow: 'unset',
+                            }}
+                          >
+                            {displayItem.description || 'No description.'}
+                          </Typography>
+                          <Typography sx={{ color: theme.colors.primary, fontWeight: 600, fontSize: 15, mb: 0.5, mt: 1 }}>₹{displayItem.price}</Typography>
+                        </CardContent>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2, mt: 0 }}>
+                          {quantity > 0 ? (
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                              <IconButton 
+                                size="small" 
+                                sx={{ color: theme.colors.primary }} 
+                                onClick={() => handleQuantityChange(displayItem._id, -1)}
+                                disabled={isNonServiceable}
+                              >
+                                <RemoveIcon />
+                              </IconButton>
+                              <Typography sx={{ minWidth: 24, textAlign: 'center', fontWeight: 600, color: theme.colors.text }}>
+                                {quantity}
+                              </Typography>
+                              <IconButton 
+                                size="small" 
+                                sx={{ color: theme.colors.primary }} 
+                                onClick={() => handleQuantityChange(displayItem._id, 1)}
+                                disabled={isNonServiceable}
+                              >
+                                <AddIcon />
+                              </IconButton>
+                            </Box>
+                          ) : (
+                            <button
+                              style={{
+                                background: isNonServiceable ? theme.colors.secondaryText : (!displayItem.isAvailable ? theme.colors.secondaryText : theme.colors.primary),
+                                color: theme.colors.buttonText,
+                                border: 'none',
+                                borderRadius: theme.borderRadius.small,
+                                padding: '6px 18px',
+                                fontWeight: 600,
+                                cursor: isNonServiceable || !displayItem.isAvailable ? 'not-allowed' : 'pointer',
+                                marginTop: 0,
+                                opacity: isNonServiceable ? 0.7 : 1
+                              }}
+                              onClick={() => {
+                                if (!isNonServiceable && displayItem.isAvailable) handleAddToCartClick(displayItem);
+                              }}
+                              disabled={isNonServiceable || !displayItem.isAvailable}
+                            >
+                              {isNonServiceable ? 'Not Serviceable' : (displayItem.isAvailable ? 'Add to Cart' : 'Out Of Stock')}
+                            </button>
+                          )}
+                        </Box>
+                      </Box>
+                    </Card>
+                  );
+                })}
+              </Box>
+              {cartWarning && (
+                <Box sx={{
                   position: 'fixed',
-                  bottom: 32,
-                  right: 32,
-                  zIndex: 3000,
-                  display: 'flex',
-                  alignItems: 'center',
-                  cursor: 'pointer',
-                  bgcolor: theme.colors.primary,
-                  color: theme.colors.buttonText,
-                  borderRadius: '50%',
-                  width: 64,
-                  height: 64,
-                  boxShadow: 6,
-                  justifyContent: 'center',
-                  transition: 'background 0.2s',
-                  '&:hover': {
-                    bgcolor: theme.colors.primaryDark || theme.colors.primary,
-                  },
-                }}
-                onClick={() => setShowAlert(true)}
-              >
-                <ShoppingCartIcon sx={{ fontSize: 36 }} />
+                  bottom: 20,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  bgcolor: theme.colors.card,
+                  color: theme.colors.error,
+                  px: 3,
+                  py: 1,
+                  borderRadius: 2,
+                  boxShadow: 4,
+                  zIndex: 2001
+                }}>
+                  <Typography>{cartWarning}</Typography>
+                </Box>
+              )}
+              <Modal open={cartConflictOpen} onClose={() => setCartConflictOpen(false)}>
                 <Box
                   sx={{
                     position: 'absolute',
-                    top: 10,
-                    right: 10,
-                    bgcolor: theme.colors.error,
-                    color: '#fff',
-                    borderRadius: '50%',
-                    width: 22,
-                    height: 22,
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    width: 350,
+                    bgcolor: theme.modal.background,
+                    color: theme.modal.text,
+                    borderRadius: theme.modal.borderRadius,
+                    boxShadow: theme.modal.boxShadow,
+                    p: 4,
                     display: 'flex',
+                    flexDirection: 'column',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: 14,
-                    fontWeight: 700,
-                    boxShadow: 2,
+                    gap: 2,
                   }}
                 >
-                  {cartItems.reduce((sum, item) => sum + item.quantity, 0)}
+                  <Typography id="cart-conflict-title" variant="h6" sx={{ mb: 2, textAlign: 'center', color: theme.modal.text }}>
+                    You have items in your cart from another outlet.
+                  </Typography>
+                  <Typography id="cart-conflict-description" sx={{ mb: 3, textAlign: 'center', color: theme.modal.text }}>
+                    Would you like to clear your cart and add items from this outlet?
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 2, width: '100%', justifyContent: 'center' }}>
+                    <Button
+                      variant="contained"
+                      sx={{ bgcolor: theme.modalButton.primary, color: theme.modalButton.primaryText, borderRadius: theme.modalButton.borderRadius, fontWeight: 600 }}
+                      onClick={() => handleCartConflict(true)}
+                    >
+                      Clear Cart & Continue
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      sx={{ color: theme.modalButton.secondaryText, borderColor: theme.modalButton.border, borderRadius: theme.modalButton.borderRadius, fontWeight: 600 }}
+                      onClick={() => handleCartConflict(false)}
+                    >
+                      Keep Current Cart
+                    </Button>
+                  </Box>
                 </Box>
-              </Box>
-            )}
-          </CardContent>
-        </Card>
-        <Snackbar
-          open={cartEmptySnackbarOpen}
-          autoHideDuration={3000}
-          onClose={() => setCartEmptySnackbarOpen(false)}
-          message={null}
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-        >
-          <Box
-            sx={{
-              bgcolor: theme.modal.background,
-              color: theme.modal.text,
-              boxShadow: theme.modal.boxShadow,
-              border: `2px solid ${theme.colors.primary}`,
-              fontFamily: theme.typography.fontFamily.bold,
-              fontSize: 18,
-              fontWeight: 600,
-              minWidth: 320,
-              px: 3,
-              py: 2,
-              textAlign: 'center',
-            }}
+              </Modal>
+              {cartItems.length > 0 && (
+                <Box
+                  sx={{
+                    position: 'fixed',
+                    bottom: 32,
+                    right: 32,
+                    zIndex: 3000,
+                    display: 'flex',
+                    alignItems: 'center',
+                    cursor: 'pointer',
+                    bgcolor: theme.colors.primary,
+                    color: theme.colors.buttonText,
+                    borderRadius: '50%',
+                    width: 64,
+                    height: 64,
+                    boxShadow: 6,
+                    justifyContent: 'center',
+                    transition: 'background 0.2s',
+                    '&:hover': {
+                      bgcolor: theme.colors.primaryDark || theme.colors.primary,
+                    },
+                  }}
+                  onClick={() => setShowAlert(true)}
+                >
+                  <ShoppingCartIcon sx={{ fontSize: 36 }} />
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      top: 10,
+                      right: 10,
+                      bgcolor: theme.colors.error,
+                      color: '#fff',
+                      borderRadius: '50%',
+                      width: 22,
+                      height: 22,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 14,
+                      fontWeight: 700,
+                      boxShadow: 2,
+                    }}
+                  >
+                    {cartItems.reduce((sum, item) => sum + item.quantity, 0)}
+                  </Box>
+                </Box>
+              )}
+            </CardContent>
+          </Card>
+          <Snackbar
+            open={cartEmptySnackbarOpen}
+            autoHideDuration={3000}
+            onClose={() => setCartEmptySnackbarOpen(false)}
+            message={null}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
           >
-            Your cart is empty.
-          </Box>
-        </Snackbar>
-        <Snackbar
-          open={snackbar.open}
-          autoHideDuration={3000}
-          onClose={handleCloseSnackbar}
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-        >
-          <Alert 
-            onClose={handleCloseSnackbar} 
-            severity={snackbar.severity}
-            sx={{ 
-              width: '100%',
-              bgcolor: theme.colors.card,
-              color: theme.colors.text,
-              '& .MuiAlert-icon': {
-                color: snackbar.severity === 'success' ? theme.colors.success : theme.colors.error
+            <Box
+              sx={{
+                bgcolor: theme.modal.background,
+                color: theme.modal.text,
+                boxShadow: theme.modal.boxShadow,
+                border: `2px solid ${theme.colors.primary}`,
+                fontFamily: theme.typography.fontFamily.bold,
+                fontSize: 18,
+                fontWeight: 600,
+                minWidth: 320,
+                px: 3,
+                py: 2,
+                textAlign: 'center',
+              }}
+            >
+              Your cart is empty.
+            </Box>
+          </Snackbar>
+          <Snackbar
+            open={snackbar.open}
+            autoHideDuration={3000}
+            onClose={handleCloseSnackbar}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+          >
+            <Alert
+              onClose={handleCloseSnackbar}
+              severity={snackbar.severity}
+              icon={snackbar.severity === 'success' ? <CheckCircleIcon sx={{ fontSize: 28, mr: 1, color: '#fff' }} /> : undefined}
+              sx={{
+                width: '100%',
+                bgcolor: snackbar.severity === 'success' ? '#219653' : theme.colors.card,
+                color: snackbar.severity === 'success' ? '#fff' : theme.colors.text,
+                borderRadius: 2.5,
+                fontWeight: 400,
+                fontSize: 16,
+                minWidth: 280,
+                px: 2,
+                py: 1,
+                boxShadow: '0 6px 32px rgba(0,0,0,0.13)',
+                alignItems: 'center',
+                display: 'flex',
+                justifyContent: 'center',
+                fontFamily: 'Trebuchet MS, Arial, sans-serif',
+                border: snackbar.severity === 'success' ? 'none' : `2px solid ${theme.colors.primary}`,
+                '& .MuiAlert-icon': {
+                  color: '#fff',
+                },
+              }}
+            >
+              {snackbar.message}
+            </Alert>
+          </Snackbar>
+          <Dialog 
+            open={showVariantModal} 
+            onClose={() => setShowVariantModal(false)}
+            PaperProps={{
+              sx: {
+                bgcolor: theme.modal.background,
+                color: theme.modal.text,
+                borderRadius: theme.modal.borderRadius,
+                boxShadow: theme.modal.boxShadow,
               }
             }}
           >
-            {snackbar.message}
-          </Alert>
-        </Snackbar>
-        <Dialog 
-          open={showVariantModal} 
-          onClose={() => setShowVariantModal(false)}
-          PaperProps={{
-            sx: {
+            <DialogTitle sx={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'space-between',
               bgcolor: theme.modal.background,
               color: theme.modal.text,
-              borderRadius: theme.modal.borderRadius,
-              boxShadow: theme.modal.boxShadow,
-            }
-          }}
-        >
-          <DialogTitle sx={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'space-between',
-            bgcolor: theme.modal.background,
-            color: theme.modal.text,
-            borderBottom: `1px solid ${theme.colors.border}`
-          }}>
-            Select a Variant
-            <IconButton onClick={() => setShowVariantModal(false)} size="small">
-              <CloseIcon />
-            </IconButton>
-          </DialogTitle>
-          <DialogContent sx={{ bgcolor: theme.modal.background, pt: 2 }}>
-            {variantItem && variantItem.variants.map((variant) => (
-              <Box 
-                key={variant._id} 
-                sx={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'space-between', 
-                  mb: 2,
-                  p: 1.5,
-                  borderRadius: 1,
-                  border: `1px solid ${selectedVariant?._id === variant._id ? theme.colors.primary : theme.colors.border}`,
-                  bgcolor: selectedVariant?._id === variant._id ? `${theme.colors.primary}10` : 'transparent',
-                  cursor: 'pointer',
-                  '&:hover': {
-                    borderColor: theme.colors.primary,
-                    bgcolor: `${theme.colors.primary}10`
-                  }
-                }}
-                onClick={() => setSelectedVariant(variant)}
-              >
-                <Box>
-                  <Typography sx={{ fontWeight: 600, color: theme.modal.text }}>{variant.label}</Typography>
-                  <Typography sx={{ color: theme.colors.secondaryText, fontSize: 14 }}>₹{variant.price}</Typography>
+              borderBottom: `1px solid ${theme.colors.border}`
+            }}>
+              Select a Variant
+              <IconButton onClick={() => setShowVariantModal(false)} size="small">
+                <CloseIcon />
+              </IconButton>
+            </DialogTitle>
+            <DialogContent sx={{ bgcolor: theme.modal.background, pt: 2 }}>
+              {variantItem && variantItem.variants.map((variant) => (
+                <Box 
+                  key={variant._id} 
+                  sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'space-between', 
+                    mb: 2,
+                    p: 1.5,
+                    borderRadius: 1,
+                    border: `1px solid ${selectedVariant?._id === variant._id ? theme.colors.primary : theme.colors.border}`,
+                    bgcolor: selectedVariant?._id === variant._id ? `${theme.colors.primary}10` : 'transparent',
+                    cursor: 'pointer',
+                    '&:hover': {
+                      borderColor: theme.colors.primary,
+                      bgcolor: `${theme.colors.primary}10`
+                    }
+                  }}
+                  onClick={() => setSelectedVariant(variant)}
+                >
+                  <Box>
+                    <Typography sx={{ fontWeight: 600, color: theme.modal.text }}>{variant.label}</Typography>
+                    <Typography sx={{ color: theme.colors.secondaryText, fontSize: 14 }}>₹{variant.price}</Typography>
+                  </Box>
+                  <Radio
+                    checked={selectedVariant?._id === variant._id}
+                    onChange={() => setSelectedVariant(variant)}
+                    sx={{ color: theme.colors.primary }}
+                  />
                 </Box>
-                <Radio
-                  checked={selectedVariant?._id === variant._id}
-                  onChange={() => setSelectedVariant(variant)}
-                  sx={{ color: theme.colors.primary }}
-                />
-              </Box>
-            ))}
-          </DialogContent>
-          <DialogActions sx={{ 
-            bgcolor: theme.modal.background,
-            borderTop: `1px solid ${theme.colors.border}`,
-            p: 2
-          }}>
-            <Button 
-              onClick={() => setShowVariantModal(false)}
-              sx={{ 
-                color: theme.colors.secondaryText,
-                '&:hover': { bgcolor: `${theme.colors.secondaryText}10` }
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="contained"
-              onClick={async () => {
-                if (!selectedVariant) {
-                  // Show error or alert that variant must be selected
-                  return;
-                }
-                const newItem = {
-                  ...variantItem,
-                  price: selectedVariant.price,
-                  variant: selectedVariant,
-                  quantity: 1,
-                  restaurantId,
-                  branchId: branchId || restaurant?.nearestBranchId,
-                };
-                try {
-                  const result = await addToCart(newItem, restaurantId, branchId || restaurant?.nearestBranchId);
-                  if (result && result.conflict) {
-                    setPendingCartItem(newItem);
-                    setCartConflictOpen(true);
-                  } else {
-                    setRecentlyAddedItem(newItem);
-                    setShowAlert(true);
+              ))}
+            </DialogContent>
+            <DialogActions sx={{ 
+              bgcolor: theme.modal.background,
+              borderTop: `1px solid ${theme.colors.border}`,
+              p: 2
+            }}>
+              <Button 
+                onClick={() => setShowVariantModal(false)}
+                sx={{ 
+                  color: theme.colors.secondaryText,
+                  '&:hover': { bgcolor: `${theme.colors.secondaryText}10` }
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="contained"
+                onClick={async () => {
+                  if (!selectedVariant) {
+                    // Show error or alert that variant must be selected
+                    return;
+                  }
+                  const newItem = {
+                    ...variantItem,
+                    price: selectedVariant.price,
+                    variant: selectedVariant,
+                    quantity: 1,
+                    restaurantId,
+                    branchId: branchId || restaurant?.nearestBranchId,
+                  };
+                  try {
+                    const result = await addToCart(newItem, restaurantId, branchId || restaurant?.nearestBranchId);
+                    if (result && result.conflict) {
+                      setPendingCartItem(newItem);
+                      setCartConflictOpen(true);
+                    } else {
+                      setRecentlyAddedItem(newItem);
+                      setShowAlert(true);
+                    }
+                    setShowVariantModal(false);
+                    setSelectedVariant(null);
+                  } catch (error) {
+                    setCartWarning(error.message || 'Failed to add item to cart');
+                    setTimeout(() => setCartWarning(''), 3000);
                   }
                   setShowVariantModal(false);
-                  setSelectedVariant(null);
-                } catch (error) {
-                  setCartWarning(error.message || 'Failed to add item to cart');
-                  setTimeout(() => setCartWarning(''), 3000);
-                }
-                setShowVariantModal(false);
-              }}
-              sx={{ 
-                bgcolor: theme.colors.primary,
-                color: theme.colors.buttonText,
-                '&:hover': { bgcolor: theme.colors.primaryDark || theme.colors.primary }
-              }}
-            >
-              Add to Cart
-            </Button>
-          </DialogActions>
-        </Dialog>
+                }}
+                sx={{ 
+                  bgcolor: theme.colors.primary,
+                  color: theme.colors.buttonText,
+                  '&:hover': { bgcolor: theme.colors.primaryDark || theme.colors.primary }
+                }}
+              >
+                Add to Cart
+              </Button>
+            </DialogActions>
+          </Dialog>
+        </Box>
       </Box>
-    </Box>
+    </>
   );
 };
 

@@ -52,9 +52,9 @@ export const lightTheme = {
   },
   typography: {
     fontFamily: {
-      regular: 'Poppins, Arial, sans-serif',
-      medium: 'Poppins, Arial, sans-serif',
-      bold: 'Poppins, Arial, sans-serif',
+      regular: 'Trebuchet MS, Arial, sans-serif',
+      medium: 'Trebuchet MS, Arial, sans-serif',
+      bold: 'Trebuchet MS, Arial, sans-serif',
     },
     fontSize: {
       xs: 12,
@@ -135,9 +135,9 @@ export const darkTheme = {
   },
   typography: {
     fontFamily: {
-      regular: 'Poppins, Arial, sans-serif',
-      medium: 'Poppins, Arial, sans-serif',
-      bold: 'Poppins, Arial, sans-serif',
+      regular: 'Trebuchet MS, Arial, sans-serif',
+      medium: 'Trebuchet MS, Arial, sans-serif',
+      bold: 'Trebuchet MS, Arial, sans-serif',
     },
     fontSize: {
       xs: 12,

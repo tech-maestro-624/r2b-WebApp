@@ -48,6 +48,7 @@ import AccordionDetails from '@mui/material/AccordionDetails';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useNavigate } from 'react-router-dom';
 import { useDeliveryAddress } from '../context/DeliveryAddressContext';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
 const FAQData = [
   {
@@ -728,19 +729,29 @@ const SideMenu = ({
         open={snackbar.open}
         autoHideDuration={3000}
         onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
         <MuiAlert
           onClose={() => setSnackbar({ ...snackbar, open: false })}
           severity={snackbar.severity}
           elevation={6}
           variant="filled"
+          icon={snackbar.severity === 'success' ? <CheckCircleIcon sx={{ fontSize: 28, mr: 1, color: '#fff' }} /> : undefined}
           sx={{
-            fontSize: 18,
-            fontWeight: 600,
-            minWidth: 320,
+            bgcolor: snackbar.severity === 'success' ? '#219653' : theme.modal.background,
+            color: snackbar.severity === 'success' ? '#fff' : theme.colors.text,
+            borderRadius: 2.5,
+            fontWeight: 400,
+            fontSize: 16,
+            minWidth: 280,
+            px: 2,
+            py: 1,
             boxShadow: '0 6px 32px rgba(0,0,0,0.13)',
             alignItems: 'center',
+            display: 'flex',
+            justifyContent: 'center',
+            fontFamily: 'Poppins, Arial, sans-serif',
+            border: snackbar.severity === 'success' ? 'none' : `2px solid ${theme.colors.primary}`,
           }}
         >
           {snackbar.message}

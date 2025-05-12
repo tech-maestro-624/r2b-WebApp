@@ -18,6 +18,7 @@ import YouTubeIcon from '@mui/icons-material/YouTube';
 import GoogleIcon from '@mui/icons-material/Google';
 import AppleIcon from '@mui/icons-material/Apple';
 import { ThemeContext } from '../context/ThemeContext';
+import logo from '../assets/logo.png';
 
 const Footer = () => {
   const { theme } = React.useContext(ThemeContext);
@@ -28,6 +29,7 @@ const Footer = () => {
     <Box
       component="footer"
       sx={{
+        fontFamily: 'Trebuchet MS, Arial, sans-serif',
         bgcolor: theme.colors.background,
         color: theme.colors.text,
         py: 6,
@@ -48,15 +50,10 @@ const Footer = () => {
         {/* Main footer content */}
         <Grid container spacing={4} justifyContent="space-between">
           {/* Logo and copyright */}
-          <Grid item xs={12} md={3}>
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="h6" sx={{ fontWeight: 700, color: theme.colors.primary, mb: 1 }}>
-                Roll2Bowl
-              </Typography>
-              <Typography variant="body2" sx={{ color: theme.colors.secondaryText, mb: 2 }}>
-                © {new Date().getFullYear()} Roll2Bowl Limited
-              </Typography>
-            </Box>
+          <Grid item xs={12} sm={4} md={2} sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', pt: 0.5 }}>
+            <a href="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none', height: 165, minWidth: 120, margin: 0, padding: 0 }}>
+              <img src={logo} alt="Roll2Bowl Logo" style={{ height: 165, width: 'auto', display: 'block', objectFit: 'contain', verticalAlign: 'middle', margin: 0, padding: 0 }} />
+            </a>
           </Grid>
 
           {/* Company */}
@@ -123,7 +120,7 @@ const Footer = () => {
               Contact us
             </Typography>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-              {['Help & Support', 'Partner with us', 'Ride with us'].map((item) => (
+              {['Help & Support', 'Partner with us'].map((item) => (
                 <Link
                   href="#"
                   key={item}
@@ -146,7 +143,7 @@ const Footer = () => {
           </Grid>
 
           {/* Available in */}
-          <Grid item xs={6} sm={4} md={2}>
+          {/* <Grid item xs={6} sm={4} md={2}>
             <Typography variant="subtitle2" sx={{ 
               fontWeight: 600, 
               mb: 2,
@@ -186,7 +183,7 @@ const Footer = () => {
                 </Link>
               ))}
             </Box>
-          </Grid>
+          </Grid> */}
 
           {/* Life at Roll2Bowl */}
           <Grid item xs={6} sm={4} md={2}>
@@ -230,47 +227,48 @@ const Footer = () => {
               ))}
             </Box>
           </Grid>
-        </Grid>
 
-        <Box sx={{ mt: 5, mb: 3 }}>
-          <Typography variant="subtitle2" sx={{ 
-            fontWeight: 600, 
-            mb: 2,
-            color: theme.colors.text,
-            position: 'relative',
-            display: 'inline-block',
-            '&:after': {
-              content: '""',
-              position: 'absolute',
-              bottom: -4,
-              left: 0,
-              width: '30px',
-              height: '2px',
-              backgroundColor: theme.colors.primary,
-            }
-          }}>
-            Legal
-          </Typography>
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-            {['Terms & Conditions', 'Cookie Policy', 'Privacy Policy', 'Investor Relations'].map((item) => (
-              <Link
-                href="#"
-                key={item}
-                underline="none"
-                sx={{ 
-                  color: theme.colors.secondaryText,
-                  fontSize: '0.875rem',
-                  transition: 'all 0.2s',
-                  '&:hover': { 
-                    color: theme.colors.primary
-                  }
-                }}
-              >
-                {item}
-              </Link>
-            ))}
-          </Box>
-        </Box>
+          {/* Legal Column */}
+          <Grid item xs={6} sm={4} md={2}>
+            <Typography variant="subtitle2" sx={{ 
+              fontWeight: 600, 
+              mb: 2,
+              color: theme.colors.text,
+              position: 'relative',
+              display: 'inline-block',
+              '&:after': {
+                content: '""',
+                position: 'absolute',
+                bottom: -4,
+                left: 0,
+                width: '30px',
+                height: '2px',
+                backgroundColor: theme.colors.primary,
+              }
+            }}>
+              Legal
+            </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+              {['Terms & Conditions', 'Cookie Policy', 'Privacy Policy', 'Investor Relations'].map((item) => (
+                <Link
+                  href="#"
+                  key={item}
+                  underline="none"
+                  sx={{ 
+                    color: theme.colors.secondaryText,
+                    fontSize: '0.875rem',
+                    transition: 'all 0.2s',
+                    '&:hover': { 
+                      color: theme.colors.primary
+                    }
+                  }}
+                >
+                  {item}
+                </Link>
+              ))}
+            </Box>
+          </Grid>
+        </Grid>
 
         <Divider sx={{ my: 4, borderColor: theme.colors.divider }} />
 
@@ -308,6 +306,13 @@ const Footer = () => {
               </IconButton>
             ))}
           </Box>
+        </Box>
+
+        {/* Bottom Centered Copyright */}
+        <Box sx={{ width: '100%', textAlign: 'center', mt: 4 }}>
+          <Typography variant="body2" sx={{ color: theme.colors.secondaryText }}>
+            © {new Date().getFullYear()} Roll2Bowl Limited
+          </Typography>
         </Box>
       </Container>
     </Box>

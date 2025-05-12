@@ -135,7 +135,7 @@ const NearbyRestaurants = () => {
       background: theme.colors.background,
       color: theme.colors.text,
       transition: 'background 0.3s, color 0.3s',
-      fontFamily: 'Poppins, Arial, sans-serif',
+      fontFamily: 'Trebuchet MS, Arial, sans-serif',
       padding: '32px 0',
     }}>
       <Container maxWidth="xl" sx={{ width: '100%', maxWidth: 1400, mx: 'auto', px: 2 }}>
@@ -211,7 +211,7 @@ const NearbyRestaurants = () => {
                   )}
                   <Box sx={{ p: 2, pt: 1.5, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                      <Typography sx={{ fontSize: 20, fontWeight: 700, flex: 1, color: theme.colors.text, fontFamily: 'Poppins, Arial, sans-serif', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <Typography sx={{ fontSize: 20, fontWeight: 700, flex: 1, color: theme.colors.text, fontFamily: 'Trebuchet MS, Arial, sans-serif', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {rest.nearestBranch?.name || rest.name}
                       </Typography>
                       <Box sx={{ ml: 1, px: 1, py: 0.25, bgcolor: theme.colors.success, color: '#fff', borderRadius: 2, fontWeight: 600, fontSize: 15, display: 'flex', alignItems: 'center', minWidth: 36, justifyContent: 'center' }}>

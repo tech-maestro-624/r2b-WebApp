@@ -45,6 +45,8 @@ import DarkModeIcon from '@mui/icons-material/DarkMode';
 import { GoogleMap, LoadScript, Marker, useJsApiLoader } from '@react-google-maps/api';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useDeliveryAddress } from '../context/DeliveryAddressContext';
+import logo from '../assets/logo.png';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
 // Helper to extract short address
 const getShortAddress = (address) => {
@@ -242,12 +244,12 @@ const Navbar = ({
   return (
     <>
       <AppBar position="sticky" elevation={0} sx={{ bgcolor: theme.colors.background, color: theme.colors.text, borderBottom: `1px solid ${theme.colors.border}`, boxShadow: '0 4px 24px rgba(0,0,0,0.13)' }}>
-        <Toolbar sx={{ maxWidth: 1440, minWidth: 0, width: '100%', mx: 'auto', px: `${theme.spacing.xl || 32}px`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Toolbar sx={{ maxWidth: 1440, minWidth: 0, width: '100%', mx: 'auto', px: `${theme.spacing.xl || 32}px`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: 64, height: 64 }}>
           {/* Left: Back Button (if not on HomePage), then Menu Icon */}
           {showBackButton ? (
             <IconButton onClick={() => navigate(-1)} sx={{ color: theme.colors.primary, mr: 1, width: 80, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'flex-start' }}>
               <ArrowBackIosNewIcon />
-              <span style={{ marginLeft: 4, fontWeight: 600, fontSize: 16, fontFamily: 'Poppins, Arial, sans-serif', color: theme.colors.primary }}>Back</span>
+              <span style={{ marginLeft: 4, fontWeight: 600, fontSize: 16, fontFamily: 'Trebuchet MS, Arial, sans-serif', color: theme.colors.primary }}>Back</span>
             </IconButton>
           ) : (
             <Box sx={{ width: 80, height: 40, mr: 1 }} />
@@ -267,9 +269,14 @@ const Navbar = ({
             </IconButton>
           </Box>
           {/* Logo */}
-          <Typography component="a" href="/" sx={{ fontFamily: 'Poppins, Arial, sans-serif', fontWeight: 700, fontSize: theme.typography.fontSize.xxl, color: theme.colors.primary, letterSpacing: 1, textDecoration: 'none', mx: { xs: 1, sm: 2 } }}>
-            roll2bowl
-          </Typography>
+          <a href="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none', marginLeft: 8, marginRight: 8, height: 88, minWidth: 120 }}>
+            <img
+              src={logo}
+              alt="Roll2Bowl Logo"
+              style={{ height: 165, width: 'auto', display: 'block', objectFit: 'contain', verticalAlign: 'middle' }}
+              onError={e => { e.target.style.display = 'none'; e.target.parentNode.innerHTML += '<span style="color:#FF5A33;font-family:Trebuchet MS, Arial, sans-serif;font-weight:700;font-size:2rem;">ROLL2BOWL</span>'; }}
+            />
+          </a>
           {/* Center: Map/Location Bar and Theme Toggle */}
           <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {/* Address/Map Bar Container */}
@@ -507,8 +514,25 @@ const Navbar = ({
           </Box>
           {/* Right: Auth/User */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: `${theme.spacing.md}px`, ml: 2 }}>
+            {isAuthenticated ? (
+              <>
+                <Typography sx={{ color: theme.colors.secondaryText, fontWeight: 500, fontSize: theme.typography.fontSize.md, textTransform: 'none' }}>
+                  {user?.name || user?.email || 'User'}
+                </Typography>
+                <Button
+                  sx={{ color: theme.colors.secondaryText, fontWeight: 500, fontSize: theme.typography.fontSize.md, textTransform: 'none' }}
+                  onClick={() => setShowLogoutModal(true)}
+                  startIcon={<LogoutIcon />}
+                >
+                  Logout
+                </Button>
+              </>
+            ) : (
+              <>
                 <Button sx={{ color: theme.colors.secondaryText, fontWeight: 500, fontSize: theme.typography.fontSize.md, textTransform: 'none' }} onClick={e => { e.preventDefault(); openLoginModal(); }}>Log in</Button>
                 <Button sx={{ color: theme.colors.secondaryText, fontWeight: 500, fontSize: theme.typography.fontSize.md, textTransform: 'none' }}>Sign up</Button>
+              </>
+            )}
           </Box>
         </Toolbar>
       </AppBar>
@@ -553,20 +577,29 @@ const Navbar = ({
         open={snackbar.open}
         autoHideDuration={3000}
         onClose={() => setSnackbar({ ...snackbar, open: false })}
-        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
         <MuiAlert
           onClose={() => setSnackbar({ ...snackbar, open: false })}
           severity={snackbar.severity}
           elevation={6}
           variant="filled"
+          icon={snackbar.severity === 'success' ? <CheckCircleIcon sx={{ fontSize: 28, mr: 1, color: '#fff' }} /> : undefined}
           sx={{
-            borderRadius: 2,
-            fontSize: 18,
-            fontWeight: 600,
-            minWidth: 320,
+            bgcolor: snackbar.severity === 'success' ? '#219653' : theme.modal.background,
+            color: snackbar.severity === 'success' ? '#fff' : theme.colors.text,
+            borderRadius: 2.5,
+            fontWeight: 400,
+            fontSize: 16,
+            minWidth: 280,
+            px: 2,
+            py: 1,
             boxShadow: '0 6px 32px rgba(0,0,0,0.13)',
             alignItems: 'center',
+            display: 'flex',
+            justifyContent: 'center',
+            fontFamily: 'Trebuchet MS, Arial, sans-serif',
+            border: snackbar.severity === 'success' ? 'none' : `2px solid ${theme.colors.primary}`,
           }}
         >
           {snackbar.message}
