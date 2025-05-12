@@ -35,6 +35,7 @@ import TextField from '@mui/material/TextField';
 import SearchIcon from '@mui/icons-material/Search';
 import { searchFoodItems } from '../services/foodService';
 import CircularProgress from '@mui/material/CircularProgress';
+import { useDeliveryAddress } from '../context/DeliveryAddressContext';
 
 
 const HomePage = () => {
@@ -52,21 +53,19 @@ const HomePage = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [showAddressModal, setShowAddressModal] = useState(false);
-  const [savedAddresses, setSavedAddresses] = useState([]);
-  const [showOrdersModal, setShowOrdersModal] = useState(false);
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
     severity: 'success', // 'success' | 'error' | 'warning' | 'info'
   });
   const [selectedAddress, setSelectedAddress] = useState(null);
-  const [selectedDeliveryAddress, setSelectedDeliveryAddress] = useState(null);
   const featuredRowRef = useRef(null);
   const [featuredRestaurants, setFeaturedRestaurants] = useState([]);
   const [loadingFeatured, setLoadingFeatured] = useState(true);
   const [searchValue, setSearchValue] = useState('');
   const [searching, setSearching] = useState(false);
   const debounceRef = useRef();
+  const [showOrdersModal, setShowOrdersModal] = useState(false);
 
   // Veg Only filter state
   const [isVegOnly, setIsVegOnly] = useState(() => {
@@ -130,6 +129,8 @@ const HomePage = () => {
     fetchCategories();
   }, []);
 
+  const { selectedDeliveryAddress, savedAddresses } = useDeliveryAddress();
+
   const fetchNearbyRestaurants = async (address) => {
     setLoadingNearbyRestaurants(true);
     try {
@@ -183,17 +184,9 @@ const HomePage = () => {
   };
 
   useEffect(() => {
+    console.log('HomePage detected address change:', selectedDeliveryAddress);
     fetchNearbyRestaurants(selectedDeliveryAddress);
   }, [selectedDeliveryAddress]);
-
-  // On initial page load, set selectedDeliveryAddress from localStorage
-  useEffect(() => {
-    (async () => {
-      const selected = await locationService.getSelectedAddress();
-      console.log('Selected address:', selected);
-      setSelectedDeliveryAddress(selected);
-    })();
-  }, []);
 
   const handleSidebarOpen = () => setSidebarOpen(true);
   const handleSidebarClose = () => setSidebarOpen(false);
@@ -213,6 +206,13 @@ const HomePage = () => {
         const selected = await locationService.getSelectedAddress();
         setSelectedAddress(selected);
       })();
+      // Listen for custom addressChanged event (same tab)
+      const handleAddressChanged = async () => {
+        const addresses = await locationService.getSavedAddresses();
+        setSavedAddresses(addresses || []);
+      };
+      window.addEventListener('addressChanged', handleAddressChanged);
+      return () => window.removeEventListener('addressChanged', handleAddressChanged);
     }
   }, [showAddressModal]);
 
@@ -220,7 +220,6 @@ const HomePage = () => {
     if (showLocationModal) {
       (async () => {
         const selected = await locationService.getSelectedAddress();
-        setSelectedDeliveryAddress(selected);
       })();
     }
   }, [showLocationModal]);

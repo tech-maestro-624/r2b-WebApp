@@ -21,6 +21,7 @@ import { CartProvider, CartContext } from './context/CartContext.jsx';
 import { AuthProvider, AuthContext } from './context/AuthContext.jsx';
 import { AuthModalProvider, useAuthModal } from './context/AuthModalContext.jsx';
 import { LocationModalProvider } from './context/LocationModalContext.jsx';
+import { DeliveryAddressProvider } from './context/DeliveryAddressContext';
 
 // Components
 import FloatingCart from './components/FloatingCart.jsx';
@@ -40,25 +41,27 @@ import Footer from './components/Footer.jsx';
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <ThemeProvider>
-        <AuthProvider>
-          <AuthModalProvider>
-            <GlobalAuthModals />
-            <LocationProvider>
-              <LocationModalProvider>
-                <CartProvider>
-                  <Suspense fallback={<div style={{ color: '#fff', textAlign: 'center', padding: 32 }}>Loading...</div>}>
-                    <AppWithCartContext />
-                  </Suspense>
-                </CartProvider>
-              </LocationModalProvider>
-            </LocationProvider>
-          </AuthModalProvider>
-        </AuthProvider>
-      </ThemeProvider>
-      <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} newestOnTop closeOnClick pauseOnFocusLoss draggable pauseOnHover />
-    </BrowserRouter>
+    <DeliveryAddressProvider>
+      <BrowserRouter>
+        <ThemeProvider>
+          <AuthProvider>
+            <AuthModalProvider>
+              <GlobalAuthModals />
+              <LocationProvider>
+                <LocationModalProvider>
+                  <CartProvider>
+                    <Suspense fallback={<div style={{ color: '#fff', textAlign: 'center', padding: 32 }}>Loading...</div>}>
+                      <AppWithCartContext />
+                    </Suspense>
+                  </CartProvider>
+                </LocationModalProvider>
+              </LocationProvider>
+            </AuthModalProvider>
+          </AuthProvider>
+        </ThemeProvider>
+        <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} newestOnTop closeOnClick pauseOnFocusLoss draggable pauseOnHover />
+      </BrowserRouter>
+    </DeliveryAddressProvider>
   );
 }
 

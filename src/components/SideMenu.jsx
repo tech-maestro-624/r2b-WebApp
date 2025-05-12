@@ -47,6 +47,7 @@ import AccordionSummary from '@mui/material/AccordionSummary';
 import AccordionDetails from '@mui/material/AccordionDetails';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useNavigate } from 'react-router-dom';
+import { useDeliveryAddress } from '../context/DeliveryAddressContext';
 
 const FAQData = [
   {
@@ -127,8 +128,6 @@ const SideMenu = ({
   const [showSettingsModal, setShowSettingsModal] = React.useState(false);
   const [orderUpdatesEnabled, setOrderUpdatesEnabled] = React.useState(true);
   const [specialOffersEnabled, setSpecialOffersEnabled] = React.useState(true);
-  const [savedAddresses, setSavedAddresses] = React.useState([]);
-  const [showSavedAddressesModal, setShowSavedAddressesModal] = React.useState(false);
   const { logout } = useContext(AuthContext);
   const [showLogoutModal, setShowLogoutModal] = React.useState(false);
   const [showCouponsModal, setShowCouponsModal] = React.useState(false);
@@ -141,9 +140,9 @@ const SideMenu = ({
   const [expandedCategory, setExpandedCategory] = React.useState(false);
   const [faqSearch, setFaqSearch] = React.useState('');
   const [expandedQuestion, setExpandedQuestion] = React.useState({});
-  const [selectedAddress, setSelectedAddress] = React.useState(null);
-  const [snackbar, setSnackbar] = React.useState({ open: false, message: '', severity: 'warning' });
+  const { savedAddresses, setSavedAddresses, selectedDeliveryAddress, setSelectedDeliveryAddress } = useDeliveryAddress();
   const navigate = useNavigate();
+  const [snackbar, setSnackbar] = React.useState({ open: false, message: '', severity: 'warning' });
 
   React.useEffect(() => {
     if (showSettingsModal) {
@@ -405,59 +404,48 @@ const SideMenu = ({
           {/* Saved Addresses Menu */}
           <Box
             sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 2, cursor: 'pointer' }}
-            onClick={() => setShowSavedAddressesModal(true)}
+            onClick={() => openAddressModal()}
           >
             <Typography sx={{ color: theme.colors.text, fontWeight: 500, fontSize: 16 }}>
               Saved Addresses
             </Typography>
             <ChevronRightIcon sx={{ color: theme.colors.secondaryText }} />
           </Box>
-        </DialogContent>
-      </Dialog>
-      {/* Saved Addresses Modal */}
-      <Dialog open={showSavedAddressesModal} onClose={() => setShowSavedAddressesModal(false)} maxWidth="sm" fullWidth
-        PaperProps={{
-          sx: { minWidth: 420, bgcolor: theme.colors.card, color: theme.colors.text, borderRadius: theme.modal?.borderRadius, boxShadow: theme.modal?.boxShadow }
-        }}
-      >
-        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', bgcolor: theme.colors.card, color: theme.colors.text }}>
-          Saved Addresses
-          <IconButton onClick={() => setShowSavedAddressesModal(false)} size="large" sx={{ color: theme.colors.secondaryText }}>
-            <CloseIcon />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent sx={{ bgcolor: theme.colors.card, minHeight: 400, maxHeight: 500, overflowY: 'auto' }}>
           {savedAddresses.length === 0 ? (
-            <Typography sx={{ color: theme.colors.secondaryText, fontSize: 14 }}>
-              No saved addresses found.
-            </Typography>
+            <Typography>No saved addresses found.</Typography>
           ) : (
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              {savedAddresses.map((addr, idx) => (
-                <Card key={idx} sx={{ borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: `1px solid ${theme.colors.border}`, display: 'flex', flexDirection: 'column', minHeight: 160, position: 'relative' }}>
-                  <CardContent sx={{ flex: 1, pb: 2 }}>
-                    <Typography sx={{ fontWeight: 600, color: theme.colors.text, mb: 0.5 }}>
-                      {addr.label || addr.type || 'Address'}
-                    </Typography>
-                    <Typography sx={{ color: theme.colors.secondaryText, fontSize: 14, mb: 0.5 }}>
-                      {addr.formattedAddress || addr.address}
-                    </Typography>
-                    {addr.pincode && (
-                      <Typography sx={{ color: theme.colors.secondaryText, fontSize: 13, mb: 1 }}>
-                        Pincode: {addr.pincode}
-                      </Typography>
-                    )}
-                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', mt: 2 }}>
-                      <Switch
-                        checked={selectedAddress && (selectedAddress.formattedAddress === addr.formattedAddress || selectedAddress.address === addr.address)}
-                        onChange={() => setSelectedAddress(addr)}
-                        color="primary"
-                      />
-                    </Box>
-                  </CardContent>
-                </Card>
-              ))}
-            </Box>
+            savedAddresses.map((addr, idx) => (
+              <Box key={idx} sx={{ mb: 2, p: 2, border: '1px solid #eee', borderRadius: 2 }}>
+                <Typography sx={{ fontWeight: 600 }}>{addr.label || addr.type || 'Address'}</Typography>
+                <Typography sx={{ fontSize: 14 }}>{addr.formattedAddress || addr.address}</Typography>
+                <Button
+                  variant="contained"
+                  sx={{
+                    bgcolor: theme.colors.primary,
+                    color: theme.colors.buttonText || '#fff',
+                    borderRadius: 2,
+                    fontWeight: 500,
+                    fontSize: 14,
+                    py: 0.5,
+                    px: 2,
+                    minWidth: 70,
+                    boxShadow: 'none',
+                    mt: 1,
+                    '&:hover': { bgcolor: theme.colors.primary }
+                  }}
+                  onClick={async () => {
+                    console.log('Current:', selectedDeliveryAddress);
+                    console.log('New:', addr);
+                    await setSelectedDeliveryAddress(addr);
+                    setShowSettingsModal(false);
+                    if (onClose) onClose();
+                    setSnackbar({ open: true, message: 'Delivery address selected!', severity: 'success' });
+                  }}
+                >
+                  Deliver Here
+                </Button>
+              </Box>
+            ))
           )}
         </DialogContent>
       </Dialog>
