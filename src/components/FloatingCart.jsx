@@ -8,7 +8,6 @@ const FloatingCart = () => {
   const { cartItems, isCartOpen, openCartModal, closeCartModal } = useContext(CartContext);
   const { theme } = useContext(ThemeContext);
 
-  console.log('FloatingCart cartItems:', cartItems);
 
   if (!cartItems || cartItems.length === 0) return null;
   console.log('Cart items:', cartItems);

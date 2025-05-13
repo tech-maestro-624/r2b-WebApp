@@ -20,6 +20,8 @@ import CircularProgress from '@mui/material/CircularProgress';
 import { Helmet } from 'react-helmet';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
+const slugify = str => str?.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
+
 const SearchItems = () => {
   const { theme } = useContext(ThemeContext);
   const location = useLocation();
@@ -155,7 +157,12 @@ const SearchItems = () => {
       await addToCart({ ...dish, quantity: 1 }, restaurantId, branchId);
       setSnackbar({ open: true, message: 'Added to cart', severity: 'success' });
       if (restaurantId && branchId) {
-        navigate(`/restaurant/${restaurantId}/${branchId}`);
+        const restaurantName = dish.restaurant?.name || dish.restaurant?._id;
+        const branchName = dish.branch?.branchName || dish.branch?._id;
+        navigate(
+          `/restaurant/${slugify(restaurantName)}/${slugify(branchName)}`,
+          { state: { restaurantId, branchId } }
+        );
       }
     } catch (e) {
       setSnackbar({ open: true, message: 'Failed to add to cart', severity: 'error' });
@@ -178,7 +185,12 @@ const SearchItems = () => {
         setSnackbar({ open: true, message: 'Cart cleared and item added', severity: 'success' });
         // Navigate to the restaurant page for this item
         if (pendingCartItem.restaurantId && pendingCartItem.branchId) {
-          navigate(`/restaurant/${pendingCartItem.restaurantId}/${pendingCartItem.branchId}`);
+          const restaurantName = pendingCartItem.restaurant?.name || pendingCartItem.restaurant?._id;
+          const branchName = pendingCartItem.branch?.branchName || pendingCartItem.branch?._id;
+          navigate(
+            `/restaurant/${slugify(restaurantName)}/${slugify(branchName)}`,
+            { state: { restaurantId: pendingCartItem.restaurantId, branchId: pendingCartItem.branchId } }
+          );
         }
       }
     }
@@ -379,7 +391,12 @@ const SearchItems = () => {
                     onClick={() => {
                       if (dish.isAvailable === false || notServiceable) return;
                       if (restaurantId && branchId) {
-                        navigate(`/restaurant/${restaurantId}/${branchId}`);
+                        const restaurantName = dish.restaurant?.name || branchDetails?.restaurant?.name;
+                        const branchName = branchDetails?.branchName;
+                        navigate(
+                          `/restaurant/${slugify(restaurantName)}/${slugify(branchName)}`,
+                          { state: { restaurantId, branchId } }
+                        );
                       }
                     }}
                   >
@@ -578,7 +595,10 @@ const SearchItems = () => {
                     onClick={() => {
                       if (notServiceable) return;
                       if (restaurantId && branchId) {
-                        navigate(`/restaurant/${restaurantName}/${branchName}`, { state: { restaurantId, branchId } });
+                        navigate(
+                          `/restaurant/${slugify(restaurantName)}/${slugify(branchName)}`,
+                          { state: { restaurantId, branchId } }
+                        );
                       }
                     }}
                   >

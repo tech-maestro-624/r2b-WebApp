@@ -50,12 +50,12 @@ export const cartService = {
    */
   getCart: async () => {
     try {
-      // Always get cart from local storage
+      // Get cart data from localStorage
       const cartData = localStorage.getItem('cartData');
       return cartData ? JSON.parse(cartData) : { items: [], restaurantId: null, branchId: null };
     } catch (error) {
-      // Fallback to empty cart
-      return { items: [], restaurantId: null, branchId: null };
+      const cartData = localStorage.getItem('cartData');
+      return cartData ? JSON.parse(cartData) : { items: [], restaurantId: null, branchId: null };
     }
   },
 
@@ -85,24 +85,11 @@ export const cartService = {
    */
   addItem: async (item, restaurantId, branchId) => {
     try {
-      // Validate input parameters
-      if (!item || !item._id) {
-        throw new Error('Invalid item data');
-      }
-      if (!restaurantId) {
-        throw new Error('Restaurant ID is required');
-      }
-      if (!branchId) {
-        throw new Error('Branch ID is required');
-      }
+      if (!item || !item._id) throw new Error('Invalid item data');
+      if (!restaurantId) throw new Error('Restaurant ID is required');
+      if (!branchId) throw new Error('Branch ID is required');
       const cart = await cartService.getCart();
-      // Check if item is from a different restaurant
       if (cart.restaurantId && cart.restaurantId !== restaurantId) {
-        console.log('Restaurant conflict detected:', {
-          currentRestaurant: cart.restaurantId,
-          newRestaurant: restaurantId,
-          cartItems: cart.items
-        });
         return {
           cart,
           conflict: true,
@@ -111,7 +98,6 @@ export const cartService = {
           newBranchId: branchId
         };
       }
-      // Ensure item has all required properties
       const normalizedItem = {
         _id: item._id,
         name: item.name || 'Unknown Item',
@@ -119,9 +105,10 @@ export const cartService = {
         quantity: item.quantity || 1,
         variant: item.variant || null,
         addOns: Array.isArray(item.addOns) ? item.addOns : [],
-        options: Array.isArray(item.options) ? item.options : []
+        options: Array.isArray(item.options) ? item.options : [],
+        originalImageId: item.originalImageId || null,
+        image: item.image || null
       };
-      // Add or update item in cart
       const existingItemIndex = cart.items.findIndex(cartItem => 
         cartItem._id === normalizedItem._id && 
         JSON.stringify(cartItem.variant) === JSON.stringify(normalizedItem.variant) &&
@@ -129,29 +116,19 @@ export const cartService = {
         JSON.stringify(cartItem.options) === JSON.stringify(normalizedItem.options)
       );
       if (existingItemIndex >= 0) {
-        // INCREMENT quantity if item already exists
-        cart.items[existingItemIndex].quantity += normalizedItem.quantity;
+        cart.items[existingItemIndex].quantity = normalizedItem.quantity;
       } else {
-        // Add new item
         cart.items.push(normalizedItem);
       }
-      // Update restaurant and branch IDs
       cart.restaurantId = restaurantId;
       cart.branchId = branchId;
-      // Save updated cart
       localStorage.setItem('cartData', JSON.stringify(cart));
-      // Notify subscribers
       await cartService.notifySubscribers();
-      console.log('notifySubscribers', await cartService.notifySubscribers());
       return {
         cart,
         conflict: false
       };
     } catch (error) {
-      if (error.response?.status === 401) {
-        authService.forceReauth();
-        throw new Error('Session expired. Please login again.');
-      }
       console.error('Add to cart error:', error);
       throw error;
     }
@@ -167,44 +144,28 @@ export const cartService = {
    */
   updateItemQuantity: async (itemId, quantity, options = {}) => {
     try {
-      // Allow unauthenticated users to update cart items
       const cart = await cartService.getCart();
       const itemIndex = cart.items.findIndex(item => {
         if (item._id !== itemId) return false;
-        // Match variant, addOns, and options if provided
-        if (options.variant && JSON.stringify(item.variant) !== JSON.stringify(options.variant)) {
-          return false;
-        }
-        if (options.addOns && JSON.stringify(item.addOns) !== JSON.stringify(options.addOns)) {
-          return false;
-        }
-        if (options.options && JSON.stringify(item.options) !== JSON.stringify(options.options)) {
-          return false;
-        }
+        if (options.variant && JSON.stringify(item.variant) !== JSON.stringify(options.variant)) return false;
+        if (options.addOns && JSON.stringify(item.addOns) !== JSON.stringify(options.addOns)) return false;
+        if (options.options && JSON.stringify(item.options) !== JSON.stringify(options.options)) return false;
         return true;
       });
       if (itemIndex >= 0) {
         if (quantity <= 0) {
-          // Remove item if quantity is 0 or negative
           cart.items.splice(itemIndex, 1);
         } else {
-          // Update quantity
           cart.items[itemIndex].quantity = quantity;
         }
-        // Clear restaurant and branch ID if cart is empty
         if (cart.items.length === 0) {
           cart.restaurantId = null;
           cart.branchId = null;
         }
-        // Save updated cart
         localStorage.setItem('cartData', JSON.stringify(cart));
       }
       return cart;
     } catch (error) {
-      if (error.response?.status === 401) {
-        authService.forceReauth();
-        throw new Error('Session expired. Please login again.');
-      }
       console.error('Update cart item error:', error);
       throw error;
     }
@@ -219,40 +180,25 @@ export const cartService = {
    */
   removeItem: async (itemId, options = {}) => {
     try {
-      // Allow unauthenticated users to remove items from cart
       const cart = await cartService.getCart();
       const itemIndex = cart.items.findIndex(item => {
         if (item._id !== itemId) return false;
-        // Match variant, addOns, and options if provided
-        if (options.variant && JSON.stringify(item.variant) !== JSON.stringify(options.variant)) {
-          return false;
-        }
-        if (options.addOns && JSON.stringify(item.addOns) !== JSON.stringify(options.addOns)) {
-          return false;
-        }
-        if (options.options && JSON.stringify(item.options) !== JSON.stringify(options.options)) {
-          return false;
-        }
+        if (options.variant && JSON.stringify(item.variant) !== JSON.stringify(options.variant)) return false;
+        if (options.addOns && JSON.stringify(item.addOns) !== JSON.stringify(options.addOns)) return false;
+        if (options.options && JSON.stringify(item.options) !== JSON.stringify(options.options)) return false;
         return true;
       });
       if (itemIndex >= 0) {
-        // Remove item
         cart.items.splice(itemIndex, 1);
-        // Clear restaurant and branch ID if cart is empty
         if (cart.items.length === 0) {
           cart.restaurantId = null;
           cart.branchId = null;
         }
-        // Save updated cart
         localStorage.setItem('cartData', JSON.stringify(cart));
-        await cartService.notifySubscribers();
       }
       return cart;
     } catch (error) {
-      if (error.response?.status === 401) {
-        authService.forceReauth();
-        throw new Error('Session expired. Please login again.');
-      }
+      console.error('Remove cart item error:', error);
       throw error;
     }
   },
@@ -264,14 +210,15 @@ export const cartService = {
    */
   clearCart: async () => {
     try {
-      // Always clear cart in local storage
       const emptyCart = { items: [], restaurantId: null, branchId: null };
       localStorage.setItem('cartData', JSON.stringify(emptyCart));
+      await cartService.notifySubscribers();
       return emptyCart;
     } catch (error) {
-      // Fallback to clearing local storage if anything fails
+      console.warn('Error in clearCart:', error.message);
       const emptyCart = { items: [], restaurantId: null, branchId: null };
       localStorage.setItem('cartData', JSON.stringify(emptyCart));
+      await cartService.notifySubscribers();
       return emptyCart;
     }
   },
@@ -280,10 +227,12 @@ export const cartService = {
    * Calculate cart totals using the API
    * 
    * @param {string} addressId - Delivery address ID
-   * @param {string} couponCode - Optional coupon code
+   * @param {string} couponId - Optional coupon ID
+   * @param {string} orderType - Order type (delivery or pickup)
+   * @param {number} deliveryTip - Optional delivery tip
    * @returns {Promise<Object>} - Cart calculation results
    */
-  calculateCart: async (addressId, couponCode = null) => {
+  calculateCart: async (addressId, couponId = null, orderType = 'delivery', deliveryTip = 0) => {
     try {
       const cart = await cartService.getCart();
       if (!cart || !cart.items || cart.items.length === 0) {
@@ -298,8 +247,39 @@ export const cartService = {
       if (!cart.branchId) {
         throw new Error('Invalid branch selected');
       }
-      // Allow cart calculation without address for initial estimates
-      const useAddressId = addressId || 'estimate';
+      // Get selected address from localStorage
+      let selectedDeliveryAddress = null;
+      try {
+        selectedDeliveryAddress = JSON.parse(localStorage.getItem('selectedDeliveryAddress'));
+      } catch (e) {
+        selectedDeliveryAddress = null;
+      }
+      let deliveryAddress = null;
+      if (selectedDeliveryAddress && selectedDeliveryAddress.coordinates) {
+        deliveryAddress = {
+          address: selectedDeliveryAddress.address || selectedDeliveryAddress.formattedAddress || 'Unknown location',
+          coordinates: selectedDeliveryAddress.coordinates,
+          pincode: selectedDeliveryAddress.pincode || '000000',
+          city: selectedDeliveryAddress.city || '',
+          state: selectedDeliveryAddress.state || '',
+          landmark: selectedDeliveryAddress.landmark || ''
+        };
+      } else {
+        // fallback to last known location
+        try {
+          const lastKnownLocation = localStorage.getItem('lastKnownLocation');
+          if (lastKnownLocation) {
+            const { coordinates, address } = JSON.parse(lastKnownLocation);
+            deliveryAddress = {
+              address: address || 'Unknown location',
+              coordinates: coordinates || { latitude: 0, longitude: 0 },
+              pincode: '000000'
+            };
+          }
+        } catch (locationError) {
+          console.warn('Error getting location for cart calculation:', locationError);
+        }
+      }
       const payload = {
         items: cart.items.map(item => ({
           _id: item._id,
@@ -310,30 +290,33 @@ export const cartService = {
         })),
         branchId: cart.branchId,
         addressId: addressId,
-        couponCode: couponCode || null
+        couponId: couponId || null,
+        orderType: orderType || 'Delivery',
+        deliveryTip: deliveryTip || 0,
+        deliveryAddress: deliveryAddress
       };
+      console.log('Cart calculation payload:', JSON.stringify(payload, null, 2));
       try {
         const calculate = await apiService.post('/order/calculate', payload);
+        console.log('Cart calculation response:', calculate);
         return calculate;
       } catch (apiError) {
+        console.error('API Error in calculateCart:', apiError);
         // Fallback to client-side calculation
         const subtotal = cart.items.reduce((total, item) => {
           return total + (item.price * (item.quantity || 1));
         }, 0);
-        // Default tax rate (10%)
         const tax = subtotal * 0.1;
-        // Default delivery fee
         const deliveryFee = subtotal > 0 ? 1.33 : 0;
-        // No discount in fallback
         const discount = 0;
-        // Calculate total
         const total = subtotal + tax + deliveryFee - discount;
         return {
           subtotal,
           tax,
           deliveryFee,
           discount,
-          total
+          total,
+          deliveryTip: deliveryTip || 0
         };
       }
     } catch (error) {
@@ -349,7 +332,6 @@ export const cartService = {
    */
   getCartCount: async () => {
     try {
-      // Allow unauthenticated users to get cart count
       const cart = await cartService.getCart();
       return cart.items.length;
     } catch (error) {

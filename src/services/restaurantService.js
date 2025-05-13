@@ -91,33 +91,26 @@ export const restaurantService = {
    */
   getFoodItems: async (branchId, includeUnavailable = false) => {
     try {
-      console.log('[DEBUG-SERVICE] getFoodItems called with branchId:', branchId);
+
       const queryParams = new URLSearchParams();
       queryParams.append('includeUnavailable', includeUnavailable);
       
-      console.log('[DEBUG-SERVICE] Making API request to:', `/food-items/${branchId}?${queryParams.toString()}`);
       const response = await apiService.get(`/food-items/${branchId}?${queryParams.toString()}`);
-      console.log('[DEBUG-SERVICE] getFoodItems raw response received:', response ? 'success' : 'null');
       
       // Process the response based on its structure
       let formattedResponse = {};
       
       // If the response already has categories with items
       if (response && response.categories) {
-        console.log('[DEBUG-SERVICE] Response contains categories array with length:', response.categories.length);
         // Map each category to a new object with resolved images
         formattedResponse.categories = await Promise.all(response.categories.map(async (category) => {
           // Resolve category image
-          console.log('[DEBUG-SERVICE] Processing category:', category.name || 'unnamed');
-          const resolvedCategory = await fileService.resolveCategoryImage(category);
+           const resolvedCategory = await fileService.resolveCategoryImage(category);
           
           // Resolve food item images
           if (resolvedCategory.items && Array.isArray(resolvedCategory.items)) {
-            console.log('[DEBUG-SERVICE] Category has items array with length:', resolvedCategory.items.length);
             resolvedCategory.items = await fileService.resolveImagesForCollection(resolvedCategory.items, 'foodItem');
-          } else {
-            console.log('[DEBUG-SERVICE] Category has no items or items is not an array');
-          }
+          } 
           
           return resolvedCategory;
         }));

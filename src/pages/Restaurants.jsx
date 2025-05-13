@@ -13,6 +13,17 @@ import Tabs from '@mui/material/Tabs'
 import Tab from '@mui/material/Tab'
 import CircularProgress from '@mui/material/CircularProgress'
 
+function slugify(text) {
+  return text
+    .toString()
+    .toLowerCase()
+    .replace(/\s+/g, '-')           // Replace spaces with -
+    .replace(/[^\w\-]+/g, '')       // Remove all non-word chars
+    .replace(/\-\-+/g, '-')         // Replace multiple - with single -
+    .replace(/^-+/, '')             // Trim - from start of text
+    .replace(/-+$/, '');            // Trim - from end of text
+}
+
 const getCachedImage = async (url) => url; // Stub for caching, replace with real cache if needed
 
 const Restaurants = () => {
@@ -213,7 +224,17 @@ const Restaurants = () => {
               cursor: 'pointer',
               transition: 'box-shadow 0.2s, transform 0.2s',
               '&:hover': { boxShadow: '0 4px 16px rgba(0,0,0,0.13)', transform: 'translateY(-2px) scale(1.03)' }
-            }} onClick={() => navigate(`/restaurant/${rest.id}/${rest.nearestBranchId}`)}>
+            }} onClick={() => {
+              const restaurantSlug = slugify(rest.name);
+              const branchSlug = slugify(rest.nearestBranch?.name || 'branch');
+              navigate(`/restaurant/${restaurantSlug}/${branchSlug}`, {
+                state: {
+                  restaurantId: rest.id,
+                  branchId: rest.nearestBranchId,
+                  // You can add more state if needed
+                }
+              });
+            }}>
               {rest.image && (
                 <Box sx={{ width: '100%', height: 160, overflow: 'hidden', borderTopLeftRadius: 12, borderTopRightRadius: 12 }}>
                   <img src={rest.image} alt={rest.name + ' cover'} style={{ width: '100%', height: '100%', objectFit: 'cover', borderTopLeftRadius: 12, borderTopRightRadius: 12 }} />

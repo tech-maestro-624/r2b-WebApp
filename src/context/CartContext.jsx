@@ -46,8 +46,6 @@ export const CartProvider = ({ children }) => {
   // Helper function to update all cart state
   const updateCartState = (cart) => {
     const items = cart.items || [];
-    console.log('updateCartState called with:', cart);
-    console.log('Setting cartItems to:', items);
     setCartItems(items);
     setRestaurantId(cart.restaurantId);
     setBranchId(cart.branchId);
@@ -66,19 +64,6 @@ export const CartProvider = ({ children }) => {
 
   // Add item to cart
   const addToCart = async (item, restaurantId, branchId) => {
-    // Optimistically update cartItems
-    setCartItems(prev => {
-      // If item already exists, increase quantity
-      const existing = prev.find(ci => ci._id === item._id);
-      if (existing) {
-        return prev.map(ci =>
-          ci._id === item._id ? { ...ci, quantity: ci.quantity + (item.quantity || 1) } : ci
-        );
-      }
-      // Otherwise, add new item
-      return [...prev, { ...item, quantity: item.quantity || 1 }];
-    });
-
     try {
       const result = await cartService.addItem(item, restaurantId, branchId);
       if (result.conflict) {
@@ -128,13 +113,15 @@ export const CartProvider = ({ children }) => {
   const openCartModal = () => setIsCartOpen(true);
   const closeCartModal = () => setIsCartOpen(false);
   // Clear cart
-  const clearCart = async () => {
+  const clearCart = async (message = 'Your cart has been cleared.', severity = 'warning') => {
     try {
       await cartService.clearCart();
       updateCartState({ items: [], restaurantId: null, branchId: null });
       closeCartModal();
+      setSnackbar({ open: true, message, severity });
     } catch (error) {
       console.error('Clear cart error:', error);
+      setSnackbar({ open: true, message: 'Failed to clear cart. Please try again.', severity: 'error' });
       throw error;
     }
   };

@@ -1,4 +1,4 @@
-import React, { useContext, useState, useEffect } from 'react';
+import React, { useContext, useState, useEffect, useReducer } from 'react';
 import Modal from '@mui/material/Modal';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
@@ -27,6 +27,7 @@ import { loadRazorpayScript } from '../utils/razorpay';
 import { CartContext } from '../context/CartContext.jsx';
 import Snackbar from '@mui/material/Snackbar';
 import Alert from '@mui/material/Alert';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 function getSavedAddresses() {
   return JSON.parse(localStorage.getItem('savedAddresses') || '[]');
@@ -119,7 +120,7 @@ const openRazorpayCheckout = async ({
 
 const CartStatusModal = ({ open, onClose, cartItems = [], handleQuantityChange, removeFromCart }) => {
   const { theme } = useContext(ThemeContext);
-  const { branchId, snackbar, handleCloseSnackbar } = useContext(CartContext);
+  const { branchId, handleCloseSnackbar, clearCart } = useContext(CartContext);
   const { isAuthenticated } = useAuthModal();
   const [cartBranch, setCartBranch] = useState(null);
   const [selectedDeliveryAddress, setSelectedDeliveryAddress] = useState(getSelectedAddress());
@@ -135,6 +136,21 @@ const CartStatusModal = ({ open, onClose, cartItems = [], handleQuantityChange, 
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [step, setStep] = useState(0); // 0 = Cart Status, 1 = Cart Summary
   const [cartConflictOpen, setCartConflictOpen] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [cartCalculation, setCartCalculation] = useState({
+    subtotal: 0,
+    tax: 0,
+    deliveryFee: 0,
+    discount: 0,
+    total: 0,
+    isFreeShipping: false,
+    taxBreakdown: [],
+    deliveryBreakdown: []
+  });
+  const [calculatingCart, setCalculatingCart] = useState(false);
+  const [, forceUpdate] = useReducer(x => x + 1, 0);
 
   useEffect(() => {
     if (open) {
@@ -165,12 +181,66 @@ const CartStatusModal = ({ open, onClose, cartItems = [], handleQuantityChange, 
     if (!open) setStep(0);
   }, [open]);
 
-  const calculateCartTotal = () =>
-    cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const calculateDeliveryFee = () =>
-    cartBranch?.restaurant?.deliveryFee ? parseFloat(cartBranch.restaurant.deliveryFee) : 0;
-  const calculateTaxes = (subtotal) =>
-    Math.round(subtotal * 0.05); // 5% tax
+  // Advanced cart calculation effect
+  useEffect(() => {
+    const calculateCartTotals = async () => {
+      if (!cartItems.length || !selectedDeliveryAddress || !selectedDeliveryAddress.coordinates) {
+        console.log('failure');
+        setCartCalculation({
+          subtotal: 0, tax: 0, deliveryFee: 0, discount: 0, total: 0, isFreeShipping: false, taxBreakdown: [], deliveryBreakdown: []
+        });
+        return;
+      }
+      setCalculatingCart(true);
+      try {
+        const addressId = selectedDeliveryAddress || selectedDeliveryAddress.id || 'estimate';
+        console.log('addressId:', addressId);
+        const calculation = await cartService.calculateCart(addressId, appliedCoupon?.code || null);
+        console.log('calculation:', calculation);
+        // Build breakdowns
+        const taxBreakdown = [
+          { label: 'Item Tax', value: calculation.totalTax || calculation.tax || 0 },
+          { label: 'Platform Fee', value: calculation.platformFee || 0 },
+          { label: 'Platform Fee Tax', value: calculation.platformFeeTax || 0 },
+          { label: 'Packaging Charges', value: calculation.packagingCharges || 0 },
+          { label: 'Packaging Tax', value: calculation.packagingChargesTax || 0 }
+        ].filter(item => item.value > 0);
+        const deliveryBreakdown = [
+          { label: 'Delivery Charge', value: calculation.deliveryCharge || calculation.deliveryFee || 0 },
+          { label: 'Delivery Tax', value: calculation.deliveryTax || 0 },
+          { label: 'Delivery Tip', value: calculation.deliveryTip || 0 }
+        ].filter(item => item.value > 0);
+        setCartCalculation({
+          subtotal: Number(calculation.subTotal || calculation.subtotal) || 0,
+          tax: taxBreakdown.reduce((sum, item) => sum + item.value, 0),
+          deliveryFee: deliveryBreakdown.reduce((sum, item) => sum + item.value, 0),
+          discount: Number(calculation.discount) || 0,
+          total: Number(calculation.grandTotal || calculation.total) || 0,
+          isFreeShipping: calculation.isFreeShipping || false,
+          taxBreakdown,
+          deliveryBreakdown
+        });
+      } catch (error) {
+        // Fallback to client-side calculation
+        const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        const tax = subtotal * 0.1;
+        const deliveryFee = subtotal > 0 ? 1.33 : 0;
+        setCartCalculation({
+          subtotal,
+          tax,
+          deliveryFee,
+          discount: 0,
+          total: subtotal + tax + deliveryFee,
+          isFreeShipping: false,
+          taxBreakdown: [{ label: 'Tax (10%)', value: tax }],
+          deliveryBreakdown: [{ label: 'Delivery Fee', value: deliveryFee }]
+        });
+      } finally {
+        setCalculatingCart(false);
+      }
+    };
+    calculateCartTotals();
+  }, [cartItems, selectedDeliveryAddress, appliedCoupon, open]);
 
   const handleAddressSelect = (address) => {
     setSelectedDeliveryAddress(address);
@@ -193,28 +263,32 @@ const CartStatusModal = ({ open, onClose, cartItems = [], handleQuantityChange, 
         selectedDeliveryAddress.coordinates.longitude == null
       ) {
         window.alert('Please select a valid delivery address');
+        setIsPaying(false);
         return;
       }
 
       // 1. Check for authentication
       if (!isAuthenticated) {
         openLoginModal();
+        setIsPaying(false);
         return;
       }
-
+console.log('isAuthenticated',isAuthenticated);
+console.log('cartBranch',cartBranch);
       // 2. Check for cart conflicts
-      if (cartItems.length > 0 && cartBranch?.restaurant?._id !== branchId) {
+      if (cartItems.length > 0 && cartBranch?._id !== branchId) {
+        console.log('isConflict ??');
         setCartConflictOpen(true);
+        setIsPaying(false);
         return;
       }
-
+     console.log('isConflict passed');
       // If authenticated, ensure token is stored
       const token = localStorage.getItem('authToken');
       if (!token && window?.authToken) {
-        // If you have a global token variable, store it
         localStorage.setItem('authToken', window.authToken);
       }
-
+console.log('token',token);
       // 2. Validate token by making a test request
       try {
         await apiService.get?.('/auth/me');
@@ -222,6 +296,7 @@ const CartStatusModal = ({ open, onClose, cartItems = [], handleQuantityChange, 
         localStorage.removeItem('authToken');
         localStorage.setItem('pendingPaymentAddressId', JSON.stringify(selectedDeliveryAddress));
         openLoginModal();
+        setIsPaying(false);
         return;
       }
 
@@ -240,6 +315,28 @@ const CartStatusModal = ({ open, onClose, cartItems = [], handleQuantityChange, 
         state,
         landmark: selectedDeliveryAddress.landmark || ''
       };
+
+      // Calculate delivery distance (optional, for debugging)
+      let deliveryDistance = null;
+      if (
+        cartBranch &&
+        cartBranch.location &&
+        cartBranch.location.coordinates &&
+        selectedDeliveryAddress &&
+        selectedDeliveryAddress.coordinates
+      ) {
+        const [branchLng, branchLat] = cartBranch.location.coordinates;
+        const userLat = selectedDeliveryAddress.coordinates.latitude;
+        const userLng = selectedDeliveryAddress.coordinates.longitude;
+        if (
+          typeof branchLat === "number" &&
+          typeof branchLng === "number" &&
+          typeof userLat === "number" &&
+          typeof userLng === "number"
+        ) {
+          deliveryDistance = getDistanceFromLatLonInKm(userLat, userLng, branchLat, branchLng);
+        }
+      }
 
       // Fetch the latest cart from cartService
       const latestCart = await cartService.getCart();
@@ -261,13 +358,16 @@ const CartStatusModal = ({ open, onClose, cartItems = [], handleQuantityChange, 
       // Build the full order payload
       const orderData = {
         items,
-        branch: branchId, // or nearestBranchId, as appropriate
+        branch: branchId,
         orderType: 'Delivery',
         paymentMethod: 'Online',
         couponCode: '',
         deliveryTip: 0,
-        deliveryAddress
+        deliveryAddress,
+        deliveryDistance
       };
+
+      console.log('Placing order with payload:', orderData);
 
       // 1. Place order (get order and payment details)
       const orderResponse = await orderService.placeOrder(orderData);
@@ -286,7 +386,15 @@ const CartStatusModal = ({ open, onClose, cartItems = [], handleQuantityChange, 
       const paymentDetails = await paymentService.initiatePayment(orderId);
       console.log('paymentDetails:', paymentDetails);
 
-      // 3. Open Razorpay checkout
+      console.log('About to open Razorpay checkout', {
+        razorpayOrderId: paymentDetails.razorpayOrderId,
+        amount: paymentDetails.amount,
+        user: {
+          email: orderResponse.order.customer?.email,
+          phone: orderResponse.order.customer?.phone,
+          name: orderResponse.order.customer?.name,
+        }
+      });
       await openRazorpayCheckout({
         razorpayOrderId: paymentDetails.razorpayOrderId,
         amount: paymentDetails.amount, // in paise
@@ -295,18 +403,21 @@ const CartStatusModal = ({ open, onClose, cartItems = [], handleQuantityChange, 
           phone: orderResponse.order.customer?.phone,
           name: orderResponse.order.customer?.name,
         },
-      
-        onSuccess: async () => {
+        onSuccess: async (response) => {
+          console.log('Razorpay payment success', response);
           setOrderSuccessOpen(true);
           await cartService.clearCart();
           setIsSummaryOpen(false);
+          setIsPaying(false);
         },
         onFailure: (err) => {
-          console.log('payment failed', err);
+          console.log('Razorpay payment failed', err);
           setPaymentError(err.message || 'Payment failed or cancelled.');
+          setIsPaying(false);
+          forceUpdate();
         },
       });
-      setIsPaying(false);
+      console.log('Razorpay checkout flow completed');
     } catch (error) {
       console.error('Order placement error:', error, error.response?.data);
       setIsPaying(false);
@@ -336,6 +447,32 @@ const CartStatusModal = ({ open, onClose, cartItems = [], handleQuantityChange, 
     }
   };
 
+  // Helper to determine if on restaurant page
+  const isOnRestaurantPage = location.pathname.startsWith('/restaurant/');
+
+  // Helper to calculate distance (same as RestaurantPage)
+  function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return (R * c);
+  }
+
+  // In the cart summary section, filter out unwanted tax/delivery breakdowns
+  // For taxBreakdown:
+  const filteredTaxBreakdown = cartCalculation.taxBreakdown.filter(item =>
+    !['Platform Fee Tax', 'Packaging Tax', 'Delivery Tax'].includes(item.label)
+  );
+  // For deliveryBreakdown:
+  const filteredDeliveryBreakdown = cartCalculation.deliveryBreakdown.filter(item =>
+    !['Delivery Tax'].includes(item.label)
+  );
+
   return (
     <>
       <Modal open={open} onClose={onClose}>
@@ -345,287 +482,392 @@ const CartStatusModal = ({ open, onClose, cartItems = [], handleQuantityChange, 
             top: '50%',
             left: '50%',
             transform: 'translate(-50%, -50%)',
-            width: '90%',
+            width: '95%',
             maxWidth: 500,
             bgcolor: theme.colors.background,
             borderRadius: 6,
             boxShadow: 24,
-            p: 4,
+            p: 0,
             color: theme.colors.text,
             border: `1.5px solid ${theme.colors.border}`,
+            maxHeight: '90vh',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'flex-start',
+            alignItems: 'stretch',
           }}
         >
           <IconButton
             aria-label="close cart"
             onClick={onClose}
-            sx={{ position: 'absolute', top: 16, right: 16 }}
+            sx={{ position: 'absolute', top: 16, right: 16, zIndex: 2 }}
           >
             <CloseIcon />
           </IconButton>
-          <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3, pt: 3 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               <Box sx={{ fontWeight: 700, color: step === 0 ? theme.colors.primary : theme.colors.secondaryText }}>Cart Status</Box>
               <Box sx={{ width: 32, height: 2, bgcolor: theme.colors.border, mx: 1 }} />
               <Box sx={{ fontWeight: 700, color: step === 1 ? theme.colors.primary : theme.colors.secondaryText }}>Cart Summary</Box>
             </Box>
           </Box>
-          {step === 0 ? (
-            <>
-              <Typography variant="h5" sx={{ mb: 1, textAlign: 'center', fontWeight: 700 }}>{cartBranch?.name}</Typography>
-              <Typography variant="body2" sx={{ mb: 3, textAlign: 'center', color: theme.colors.secondaryText }}>{cartBranch?.address}</Typography>
-              {cartItems.length === 0 ? (
-                <Typography sx={{ textAlign: 'center' }}>Your cart is empty.</Typography>
-              ) : (
-                <>
-                  {cartItems.map(item => (
-                    <Box key={item._id} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                      <Box>
-                        <Typography sx={{ fontWeight: 500 }}>{item.name}</Typography>
-                        <Typography variant="caption">₹{item.price}</Typography>
+          <Box sx={{ flex: 1, overflowY: 'auto', px: 4, pb: 4, pt: 0, minHeight: 120 }}>
+            {step === 0 ? (
+              <>
+                <Typography variant="h5" sx={{ mb: 1, textAlign: 'center', fontWeight: 700 }}>{cartBranch?.name}</Typography>
+                <Typography variant="body2" sx={{ mb: 3, textAlign: 'center', color: theme.colors.secondaryText }}>{cartBranch?.address}</Typography>
+                {cartItems.length === 0 ? (
+                  <Typography sx={{ textAlign: 'center' }}>Your cart is empty.</Typography>
+                ) : (
+                  <>
+                    {cartItems.map(item => (
+                      <Box key={item._id} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                        <Box>
+                          <Typography sx={{ fontWeight: 500 }}>{item.name}</Typography>
+                          <Typography variant="caption">₹{item.price}</Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <IconButton 
+                            size="small" 
+                            sx={{ color: theme.colors.primary }} 
+                            onClick={() => handleUpdateCartQuantity(item._id, -1, item.quantity)}
+                          >
+                            <RemoveIcon />
+                          </IconButton>
+                          <Typography sx={{ minWidth: 24, textAlign: 'center', fontWeight: 600 }}>
+                            {item.quantity}
+                          </Typography>
+                          <IconButton 
+                            size="small" 
+                            sx={{ color: theme.colors.primary }} 
+                            onClick={() => handleUpdateCartQuantity(item._id, 1, item.quantity)}
+                          >
+                            <AddIcon />
+                          </IconButton>
+                          <IconButton 
+                            size="small" 
+                            sx={{ color: theme.colors.error, ml: 1 }} 
+                            onClick={() => removeFromCart(item._id)}
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </Box>
                       </Box>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <IconButton 
-                          size="small" 
-                          sx={{ color: theme.colors.primary }} 
-                          onClick={() => handleUpdateCartQuantity(item._id, -1, item.quantity)}
-                        >
-                          <RemoveIcon />
-                        </IconButton>
-                        <Typography sx={{ minWidth: 24, textAlign: 'center', fontWeight: 600 }}>
-                          {item.quantity}
-                        </Typography>
-                        <IconButton 
-                          size="small" 
-                          sx={{ color: theme.colors.primary }} 
-                          onClick={() => handleUpdateCartQuantity(item._id, 1, item.quantity)}
-                        >
-                          <AddIcon />
-                        </IconButton>
-                        <IconButton 
-                          size="small" 
-                          sx={{ color: theme.colors.error, ml: 1 }} 
-                          onClick={() => removeFromCart(item._id)}
-                        >
-                          <DeleteIcon />
-                        </IconButton>
-                      </Box>
-                    </Box>
-                  ))}
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, justifyContent: 'flex-end' }}>
-                    <input
-                      type="text"
-                      placeholder="Coupon Code"
-                      value={couponCode}
-                      onChange={e => setCouponCode(e.target.value)}
-                      disabled={!!appliedCoupon}
-                      style={{ width: 160, padding: '8px', borderRadius: 4, border: `1px solid ${theme.colors.border}` }}
-                    />
-                    <Button
-                      variant="outlined"
-                      sx={{
-                        borderColor: theme.colors.primary,
-                        color: theme.colors.primary,
-                        background: 'transparent',
-                        fontWeight: 600,
-                        '&:hover': { borderColor: theme.colors.primary, bgcolor: theme.colors.card }
-                      }}
-                      onClick={async () => {
-                        if (!couponCode.trim()) {
-                          setCouponFeedback('Please enter a coupon code.');
-                          return;
-                        }
-                        try {
-                          // Placeholder: replace with your coupon validation logic
-                          if (couponCode.trim().toLowerCase() === 'save10') {
-                            setAppliedCoupon({ code: 'SAVE10', discountAmount: 10, description: 'Flat ₹10 off' });
-                            setCouponFeedback('Coupon applied!');
-                          } else {
-                            setCouponFeedback('Invalid coupon code.');
+                    ))}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, justifyContent: 'flex-end' }}>
+                      <input
+                        type="text"
+                        placeholder="Coupon Code"
+                        value={couponCode}
+                        onChange={e => setCouponCode(e.target.value)}
+                        disabled={!!appliedCoupon}
+                        style={{ width: 160, padding: '8px', borderRadius: 4, border: `1px solid ${theme.colors.border}` }}
+                      />
+                      <Button
+                        variant="outlined"
+                        sx={{
+                          borderColor: theme.colors.primary,
+                          color: theme.colors.primary,
+                          background: 'transparent',
+                          fontWeight: 600,
+                          '&:hover': { borderColor: theme.colors.primary, bgcolor: theme.colors.card }
+                        }}
+                        onClick={async () => {
+                          if (!couponCode.trim()) {
+                            setCouponFeedback('Please enter a coupon code.');
+                            return;
                           }
-                        } catch (err) {
-                          setCouponFeedback('Invalid or expired coupon.');
-                        }
-                      }}
-                      disabled={!!appliedCoupon}
-                    >
-                      Apply
-                    </Button>
-                  </Box>
-                  {couponFeedback && (
-                    <Typography sx={{ color: appliedCoupon ? 'green' : theme.colors.error, mb: 1 }}>
-                      {couponFeedback}
-                    </Typography>
-                  )}
-                  {appliedCoupon && (
-                    <Typography sx={{ color: 'green', mb: 1 }}>
-                      Applied: {appliedCoupon.code} ({appliedCoupon.description || ''})
-                    </Typography>
-                  )}
-                  <Box sx={{ mt: 3, mb: 2 }}>
-                    {selectedDeliveryAddress ? (
-                      <Box sx={{ bgcolor: theme.colors.background, p: 2, borderRadius: 2, border: `1px solid ${theme.colors.border}` }}>
-                        <Typography variant="subtitle2" sx={{ color: theme.colors.primary, mb: 1, fontWeight: 700 }}>
-                          Delivery Address
-                        </Typography>
-                        <Typography variant="body2">
-                          {selectedDeliveryAddress.formattedAddress || selectedDeliveryAddress.address}
-                        </Typography>
-                      </Box>
-                    ) : (
-                      <Typography sx={{ color: theme.colors.error, mb: 1, fontWeight: 500 }}>
-                        Please select a delivery address
+                          try {
+                            // Placeholder: replace with your coupon validation logic
+                            if (couponCode.trim().toLowerCase() === 'save10') {
+                              setAppliedCoupon({ code: 'SAVE10', discountAmount: 10, description: 'Flat ₹10 off' });
+                              setCouponFeedback('Coupon applied!');
+                            } else {
+                              setCouponFeedback('Invalid coupon code.');
+                            }
+                          } catch (err) {
+                            setCouponFeedback('Invalid or expired coupon.');
+                          }
+                        }}
+                        disabled={!!appliedCoupon}
+                      >
+                        Apply
+                      </Button>
+                    </Box>
+                    {couponFeedback && (
+                      <Typography sx={{ color: appliedCoupon ? 'green' : theme.colors.error, mb: 1 }}>
+                        {couponFeedback}
                       </Typography>
                     )}
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
-                      <Button
-                        variant="outlined"
-                        sx={{
-                          textTransform: 'none',
-                          fontWeight: 600,
-                          borderColor: theme.colors.primary,
-                          color: theme.colors.primary,
-                          background: 'transparent',
-                          '&:hover': { borderColor: theme.colors.primary, bgcolor: theme.colors.card }
-                        }}
-                        onClick={() => setShowAddressModal(true)}
-                      >
-                        {selectedDeliveryAddress ? 'Change Selected Address' : 'Choose Delivery Address @@'}
-                      </Button>
-                      <Button
-                        variant="outlined"
-                        sx={{
-                          textTransform: 'none',
-                          fontWeight: 700,
-                          minWidth: 200,
-                          ml: 2,
-                          borderColor: theme.colors.primary,
-                          color: theme.colors.primary,
-                          background: 'transparent',
-                          '&:hover': { borderColor: theme.colors.primary, bgcolor: theme.colors.card }
-                        }}
-                        onClick={() => setStep(1)}
-                        disabled={!selectedDeliveryAddress}
-                      >
-                   Review & Pay
-                      </Button>
-                    </Box>
-                  </Box>
-                  <Dialog 
-                    open={showAddressModal} 
-                    onClose={() => setShowAddressModal(false)}
-                    maxWidth="xs" 
-                    fullWidth
-                  >
-                    <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', bgcolor: theme.colors.card, color: theme.colors.text }}>
-                      Select Delivery Address
-                      <IconButton onClick={() => setShowAddressModal(false)}>
-                        <CloseIcon />
-                      </IconButton>
-                    </DialogTitle>
-                    <DialogContent sx={{ bgcolor: theme.colors.card, color: theme.colors.text }}>
-                      <List>
-                        {savedAddresses.map((addr, idx) => (
-                          <ListItem
-                            key={idx}
-                            sx={{ flexDirection: 'row', alignItems: 'center', mb: 1 }}
-                            secondaryAction={
-                              <Radio
-                                checked={selectedDeliveryAddress?.formattedAddress === addr.formattedAddress}
-                                onChange={() => handleAddressSelect(addr)}
-                                value={idx}
-                                name="address-radio"
-                                color="primary"
-                              />
-                            }
+                    {appliedCoupon && (
+                      <Typography sx={{ color: 'green', mb: 1 }}>
+                        Applied: {appliedCoupon.code} ({appliedCoupon.description || ''})
+                      </Typography>
+                    )}
+                    <Box sx={{ mt: 3, mb: 2 }}>
+                      {selectedDeliveryAddress ? (
+                        <Box sx={{ bgcolor: theme.colors.background, p: 2, borderRadius: 2, border: `1px solid ${theme.colors.border}` }}>
+                          <Typography variant="subtitle2" sx={{ color: theme.colors.primary, mb: 1, fontWeight: 700 }}>
+                            Delivery Address
+                          </Typography>
+                          <Typography variant="body2">
+                            {selectedDeliveryAddress.formattedAddress || selectedDeliveryAddress.address}
+                          </Typography>
+                        </Box>
+                      ) : (
+                        <Typography sx={{ color: theme.colors.error, mb: 1, fontWeight: 500 }}>
+                          Please select a delivery address
+                        </Typography>
+                      )}
+                      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', mt: 2 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', mt: 3, gap: 2 }}>
+                          {/* Show Go to Restaurant only if not on restaurant page and cartBranch is available */}
+                          {!isOnRestaurantPage && cartBranch && (
+                            <Button
+                              variant="contained"
+                              sx={{
+                                fontWeight: 700,
+                                minWidth: 180,
+                                bgcolor: theme.colors.primary,
+                                color: theme.colors.buttonText,
+                                borderRadius: 2,
+                                boxShadow: 'none',
+                                border: `1.5px solid ${theme.colors.primary}`,
+                                '&:hover': {
+                                  bgcolor: theme.colors.primary,
+                                  color: theme.colors.buttonText,
+                                  boxShadow: '0 2px 8px rgba(0,0,0,0.10)'
+                                }
+                              }}
+                              onClick={async () => {
+                                // Use slugs for URL if possible
+                                const restaurantName = cartBranch.restaurant?.name || cartBranch.name || 'restaurant';
+                                const branchName = cartBranch.branchName || cartBranch.name || 'branch';
+                                const slugify = str => str?.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
+                                // Serviceability check
+                                let selectedDeliveryAddress = null;
+                                try {
+                                  selectedDeliveryAddress = JSON.parse(localStorage.getItem('selectedDeliveryAddress'));
+                                } catch {}
+                                let isServiceable = true;
+                                if (
+                                  selectedDeliveryAddress &&
+                                  selectedDeliveryAddress.coordinates &&
+                                  cartBranch.location &&
+                                  cartBranch.serviceableDistance
+                                ) {
+                                  const [branchLng, branchLat] = cartBranch.location.coordinates;
+                                  const userLat = selectedDeliveryAddress.coordinates.latitude;
+                                  const userLng = selectedDeliveryAddress.coordinates.longitude;
+                                  if (typeof userLat === 'number' && typeof userLng === 'number') {
+                                    const distance = getDistanceFromLatLonInKm(userLat, userLng, branchLat, branchLng);
+                                    if (distance > parseFloat(cartBranch.serviceableDistance)) {
+                                      isServiceable = false;
+                                    }
+                                  }
+                                }
+                                if (!isServiceable) {
+                                  // Clear the cart before navigating (real-time, via context)
+                                  await clearCart();
+                                }
+                                navigate(`/restaurant/${slugify(restaurantName)}/${slugify(branchName)}`, {
+                                  state: {
+                                    restaurantId: cartBranch.restaurant?._id || cartBranch.restaurantId,
+                                    branchId: cartBranch._id || cartBranch.branchId
+                                  }
+                                });
+                                onClose && onClose();
+                              }}
+                            >
+                              Go to Restaurant
+                            </Button>
+                          )}
+                          {/* Always show Review & Pay button */}
+                          <Button
+                            variant="outlined"
+                            sx={{
+                              textTransform: 'none',
+                              fontWeight: 700,
+                              minWidth: 180,
+                              borderColor: theme.colors.primary,
+                              color: theme.colors.primary,
+                              background: 'transparent',
+                              borderRadius: 2,
+                              '&:hover': { borderColor: theme.colors.primary, bgcolor: theme.colors.card }
+                            }}
+                            onClick={async () => {
+                              // Serviceability check before moving to summary
+                              let isServiceable = true;
+                              if (
+                                selectedDeliveryAddress &&
+                                selectedDeliveryAddress.coordinates &&
+                                cartBranch &&
+                                cartBranch.location &&
+                                cartBranch.serviceableDistance
+                              ) {
+                                const [branchLng, branchLat] = cartBranch.location.coordinates;
+                                const userLat = selectedDeliveryAddress.coordinates.latitude;
+                                const userLng = selectedDeliveryAddress.coordinates.longitude;
+                                if (typeof userLat === 'number' && typeof userLng === 'number') {
+                                  const distance = getDistanceFromLatLonInKm(userLat, userLng, branchLat, branchLng);
+                                  if (distance > parseFloat(cartBranch.serviceableDistance)) {
+                                    isServiceable = false;
+                                  }
+                                }
+                              }
+                              if (!isServiceable) {
+                                await clearCart();
+                                handleCloseSnackbar && handleCloseSnackbar();
+                                setTimeout(() => {
+                                  setSnackbar({
+                                    open: true,
+                                    message: 'This food item is not serviceable to your address. Please select another branch to order.',
+                                    severity: 'error',
+                                  });
+                                }, 100);
+                                return;
+                              }
+                              setStep(1);
+                            }}
+                            disabled={!selectedDeliveryAddress}
                           >
-                            <Box sx={{ flex: 1 }}>
-                              <Typography sx={{ fontWeight: 600, color: theme.colors.text }}>
-                                {addr.label || 'Address'}
-                              </Typography>
-                              <Typography sx={{ color: theme.colors.secondaryText, fontSize: 14 }}>
-                                {addr.formattedAddress || addr.address}
-                              </Typography>
-                            </Box>
-                          </ListItem>
-                        ))}
-                      </List>
-                    </DialogContent>
-                  </Dialog>
-                </>
-              )}
-            </>
-          ) : (
-            <>
-              {cartItems.map(item => (
-                <Box key={item._id} sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                  <Typography sx={{ fontWeight: 500 }}>{item.name} × {item.quantity}</Typography>
-                  <Typography sx={{ fontWeight: 500 }}>₹{item.price * item.quantity}</Typography>
+                            Review & Pay
+                          </Button>
+                        </Box>
+                      </Box>
+                    </Box>
+                    <Dialog 
+                      open={showAddressModal} 
+                      onClose={() => setShowAddressModal(false)}
+                      maxWidth="xs" 
+                      fullWidth
+                    >
+                      <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', bgcolor: theme.colors.card, color: theme.colors.text }}>
+                        Select Delivery Address
+                        <IconButton onClick={() => setShowAddressModal(false)}>
+                          <CloseIcon />
+                        </IconButton>
+                      </DialogTitle>
+                      <DialogContent sx={{ bgcolor: theme.colors.card, color: theme.colors.text }}>
+                        <List>
+                          {savedAddresses.map((addr, idx) => (
+                            <ListItem
+                              key={idx}
+                              sx={{ flexDirection: 'row', alignItems: 'center', mb: 1 }}
+                              secondaryAction={
+                                <Radio
+                                  checked={selectedDeliveryAddress?.formattedAddress === addr.formattedAddress}
+                                  onChange={() => handleAddressSelect(addr)}
+                                  value={idx}
+                                  name="address-radio"
+                                  color="primary"
+                                />
+                              }
+                            >
+                              <Box sx={{ flex: 1 }}>
+                                <Typography sx={{ fontWeight: 600, color: theme.colors.text }}>
+                                  {addr.label || 'Address'}
+                                </Typography>
+                                <Typography sx={{ color: theme.colors.secondaryText, fontSize: 14 }}>
+                                  {addr.formattedAddress || addr.address}
+                                </Typography>
+                              </Box>
+                            </ListItem>
+                          ))}
+                        </List>
+                      </DialogContent>
+                    </Dialog>
+                  </>
+                )}
+              </>
+            ) : (
+              <>
+                <Box sx={{ mb: 2 }}>
+                  {cartItems.map(item => (
+                    <Box key={item._id} sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                      <Typography sx={{ fontWeight: 500 }}>{item.name} × {item.quantity}</Typography>
+                      <Typography sx={{ fontWeight: 500 }}>₹{item.price * item.quantity}</Typography>
+                    </Box>
+                  ))}
                 </Box>
-              ))}
-              <Divider sx={{ my: 2 }} />
-              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Typography>Subtotal:</Typography>
-                <Typography>₹{calculateCartTotal()}</Typography>
-              </Box>
-              {appliedCoupon && (
-                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Typography>Coupon Discount:</Typography>
-                  <Typography sx={{ color: 'green' }}>-₹{appliedCoupon.discountAmount || 0}</Typography>
+                <Divider sx={{ my: 2 }} />
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography>Subtotal:</Typography>
+                    <Typography>₹{cartCalculation.subtotal.toFixed(2)}</Typography>
+                  </Box>
+                  {filteredTaxBreakdown.map((item, idx) => (
+                    <Box key={item.label + idx} sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <Typography>{item.label}:</Typography>
+                      <Typography>₹{item.value.toFixed(2)}</Typography>
+                    </Box>
+                  ))}
+                  {filteredDeliveryBreakdown.map((item, idx) => (
+                    <Box key={item.label + idx} sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <Typography>{item.label}:</Typography>
+                      <Typography>₹{cartCalculation.isFreeShipping && item.label.toLowerCase().includes('delivery') ? 'FREE' : item.value.toFixed(2)}</Typography>
+                    </Box>
+                  ))}
+                  {cartCalculation.discount > 0 && (
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <Typography sx={{ color: 'green' }}>Discount:</Typography>
+                      <Typography sx={{ color: 'green' }}>-₹{cartCalculation.discount.toFixed(2)}</Typography>
+                    </Box>
+                  )}
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
+                    <Typography variant="h6" sx={{ fontWeight: 700 }}>Total:</Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                      ₹{cartCalculation.total.toFixed(2)}
+                    </Typography>
+                  </Box>
                 </Box>
-              )}
-              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Typography>Delivery:</Typography>
-                <Typography>₹{calculateDeliveryFee()}</Typography>
-              </Box>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Typography>Tax (5%):</Typography>
-                <Typography>₹{calculateTaxes(calculateCartTotal())}</Typography>
-              </Box>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
-                <Typography variant="h6" sx={{ fontWeight: 700 }}>Total:</Typography>
-                <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                  ₹{calculateCartTotal() + calculateDeliveryFee() + calculateTaxes(calculateCartTotal()) - (appliedCoupon?.discountAmount || 0)}
-                </Typography>
-              </Box>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 2, mt: 2 }}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-                  Delivery Address:
-                </Typography>
-                <Typography variant="body2">
-                  {selectedDeliveryAddress?.formattedAddress || selectedDeliveryAddress?.address || 'No address selected'}
-                </Typography>
-              </Box>
-              <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between', gap: 2 }}>
-                <Button
-                  variant="outlined"
-                  color="primary"
-                  sx={{ textTransform: 'none', fontWeight: 700, minWidth: 120 }}
-                  onClick={() => setStep(0)}
-                >
-                  Back
-                </Button>
-                <Button
-                  variant="outlined"
-                  color="primary"
-                  sx={{
-                    textTransform: 'none',
-                    fontWeight: 700,
-                    minWidth: 200,
-                    bgcolor: 'transparent',
-                    borderColor: theme.colors.primary,
-                    color: theme.colors.primary,
-                    '&:hover': { borderColor: theme.colors.primary, bgcolor: theme.colors.card }
-                  }}
-                  onClick={handlePlaceOrder}
-                  disabled={!selectedDeliveryAddress}
-                >
-                  Place Order Now
-                </Button>
-              </Box>
-              {isPaying && <div>Processing payment, please wait...</div>}
-              {paymentError && <div style={{ color: theme.colors.error }}>{paymentError}</div>}
-            </>
-          )}
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 2, mt: 2 }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+                    Delivery Address:
+                  </Typography>
+                  <Typography variant="body2">
+                    {selectedDeliveryAddress?.formattedAddress || selectedDeliveryAddress?.address || 'No address selected'}
+                  </Typography>
+                </Box>
+                <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between', gap: 2 }}>
+                  <Button
+                    variant="outlined"
+                    color="primary"
+                    sx={{
+                      textTransform: 'none',
+                      fontWeight: 700,
+                      minWidth: 120,
+                      borderColor: theme.colors.primary,
+                      color: theme.colors.primary,
+                      bgcolor: 'transparent',
+                      '&:hover': { borderColor: theme.colors.primary, bgcolor: theme.colors.card }
+                    }}
+                    onClick={() => setStep(0)}
+                  >
+                    Back
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    color="primary"
+                    sx={{
+                      textTransform: 'none',
+                      fontWeight: 700,
+                      minWidth: 180,
+                      borderColor: theme.colors.primary,
+                      color: theme.colors.primary,
+                      background: 'transparent',
+                      borderRadius: 2,
+                      '&:hover': { borderColor: theme.colors.primary, bgcolor: theme.colors.card }
+                    }}
+                    onClick={handlePlaceOrder}
+                    disabled={!selectedDeliveryAddress}
+                  >
+                    Place Order Now
+                  </Button>
+                </Box>
+              </>
+            )}
+          </Box>
         </Box>
       </Modal>
       <Modal open={orderSuccessOpen} onClose={() => { setOrderSuccessOpen(false); onClose(); }}>
@@ -636,7 +878,7 @@ const CartStatusModal = ({ open, onClose, cartItems = [], handleQuantityChange, 
             left: '50%',
             transform: 'translate(-50%, -50%)',
             width: 400,
-            bgcolor: 'background.paper',
+            bgcolor: theme.colors.card || (theme.palette?.mode === 'dark' ? '#222' : '#fff'),
             borderRadius: 4,
             boxShadow: 24,
             p: 4,
@@ -644,15 +886,34 @@ const CartStatusModal = ({ open, onClose, cartItems = [], handleQuantityChange, 
             flexDirection: 'column',
             alignItems: 'center',
             gap: 2,
+            color: theme.colors.text || (theme.palette?.mode === 'dark' ? '#fff' : '#222'),
+            border: `2px solid ${theme.colors.primary}`,
           }}
         >
-          <CheckCircleIcon sx={{ fontSize: 60, color: 'green' }} />
-          <Typography variant="h5" sx={{ fontWeight: 700, mb: 1 }}>Order Placed Successfully!</Typography>
-          <Typography variant="body1" sx={{ mb: 2, textAlign: 'center' }}>
+          <CheckCircleIcon sx={{ fontSize: 60, color: theme.colors.success || 'green', mb: 1 }} />
+          <Typography variant="h5" sx={{ fontWeight: 700, mb: 1, color: theme.colors.text || (theme.palette?.mode === 'dark' ? '#fff' : '#222') }}>
+            Order Placed Successfully!
+          </Typography>
+          <Typography variant="body1" sx={{ mb: 2, textAlign: 'center', color: theme.colors.secondaryText || (theme.palette?.mode === 'dark' ? '#ccc' : '#444') }}>
             Thank you for your order. Your payment was successful and your order has been placed.
           </Typography>
-          <Button variant="contained" color="primary" onClick={() => { setOrderSuccessOpen(false); onClose(); }}>
-            Close
+          <Button
+            variant="contained"
+            sx={{
+              bgcolor: theme.colors.primary,
+              color: theme.colors.buttonText,
+              '&:hover': {
+                bgcolor: theme.colors.primaryDark || theme.colors.primary,
+                color: theme.colors.buttonText,
+              },
+              borderRadius: 2,
+              fontWeight: 700,
+              minWidth: 120,
+              boxShadow: 'none',
+            }}
+            onClick={() => { setOrderSuccessOpen(false); onClose(); }}
+          >
+            CLOSE
           </Button>
         </Box>
       </Modal>

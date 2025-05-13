@@ -34,6 +34,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import OutlinedInput from '@mui/material/OutlinedInput';
 import { Helmet } from 'react-helmet';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import { useDeliveryAddress } from '../context/DeliveryAddressContext';
 
 function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
   const R = 6371; // Radius of the earth in km
@@ -53,7 +54,7 @@ const RestaurantPage = () => {
   const location = useLocation();
   const restaurantId = location.state?.restaurantId;
   const branchId = location.state?.branchId;
-  const { openCartModal, closeCartModal, isCartOpen, cartItems, addToCart, removeFromCart, restaurantId: cartRestaurantId, branchId: cartBranchId, changeCartItemQuantity } = useContext(CartContext);
+  const { openCartModal, closeCartModal, isCartOpen, cartItems, addToCart, removeFromCart, restaurantId: cartRestaurantId, branchId: cartBranchId, changeCartItemQuantity, clearCart, snackbar, handleCloseSnackbar } = useContext(CartContext);
   const { isAuthenticated, openLoginModal } = useAuthModal();
   const [restaurant, setRestaurant] = useState(null);
   const [branch, setBranch] = useState(null);
@@ -67,7 +68,6 @@ const RestaurantPage = () => {
   const [showAlert, setShowAlert] = useState(false);
   const [cartWarning, setCartWarning] = useState('');
   const [recentlyAddedItem, setRecentlyAddedItem] = useState(null);
-  const [selectedDeliveryAddress, setSelectedDeliveryAddress] = useState(null);
   const [cartEmptySnackbarOpen, setCartEmptySnackbarOpen] = useState(false);
   const [cartConflictOpen, setCartConflictOpen] = useState(false);
   const [pendingCartItem, setPendingCartItem] = useState(null);
@@ -76,10 +76,13 @@ const RestaurantPage = () => {
   const [selectedVariant, setSelectedVariant] = useState(null);
   const [showVariantModal, setShowVariantModal] = useState(false);
   const [variantItem, setVariantItem] = useState(null);
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const categoryFromNavigation = location.state?.categoryName;
   const [selectedOutlet, setSelectedOutlet] = useState(null);
   const [branchDetails, setBranchDetails] = useState([]);
+  const { selectedDeliveryAddress } = useDeliveryAddress();
+  const [isCartConflictLoading, setIsCartConflictLoading] = useState(false);
+  const [selectedAddOns, setSelectedAddOns] = useState([]); // For add-ons
+  const [selectedOptions, setSelectedOptions] = useState([]); // For options
 
   // Get user coordinates from localStorage
   let userCoords = null;
@@ -108,24 +111,30 @@ const RestaurantPage = () => {
   };
 
   const handleAddToCartClick = async (item) => {
+    const currentBranchId = selectedOutlet || branchId;
+
     if (item.hasVariants && Array.isArray(item.variants) && item.variants.length > 0) {
       setVariantItem(item);
       setShowVariantModal(true);
       return;
     }
 
-    // Check for cart conflict before adding
-    if (cartItems.length > 0 && cartRestaurantId !== restaurantId) {
-      setPendingCartItem(item);
+    // Cart conflict check
+    if (
+      cartItems.length > 0 &&
+      cartRestaurantId === restaurantId &&
+      cartBranchId !== currentBranchId
+    ) {
+      setPendingCartItem({ ...item, branchId: currentBranchId });
       setCartConflictOpen(true);
-      return;
+      return; // <-- DO NOT call addToCart
     }
 
-    // If no conflict, proceed with adding to cart
+    // No conflict, proceed
     setShowAlert(false);
-    const result = await addToCart({ ...item, quantity: 1 }, restaurantId, branchId);
+    const result = await addToCart({ ...item, quantity: 1 }, restaurantId, currentBranchId);
     if (result && result.conflict) {
-      setPendingCartItem(item);
+      setPendingCartItem({ ...item, branchId: currentBranchId });
       setCartConflictOpen(true);
       return;
     }
@@ -170,10 +179,6 @@ const RestaurantPage = () => {
     }
   };
 
-  const handleCloseSnackbar = () => {
-    setSnackbar(prev => ({ ...prev, open: false }));
-  };
-
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -186,7 +191,6 @@ const RestaurantPage = () => {
         }
 
         const restRes = await restaurantService.getRestaurantById(restaurantId);
-        console.log('restRes', restRes);
         const restaurantData = restRes?.restaurant || restRes || null;
         setRestaurant(restaurantData);
         
@@ -200,11 +204,9 @@ const RestaurantPage = () => {
         // Fetch branch details if restaurant has multiple branches
         if (restaurantData?.branches?.length > 1) {
           try {
-            const branchPromises = restaurantData.branches.map(branchId => {
-              // Ensure branchId is a string
-              const id = typeof branchId === 'object' ? branchId._id : branchId;
-              return restaurantService.getBranchById(id);
-            });
+            const branchPromises = restaurantData.branches.map(branch =>
+              restaurantService.getBranchById(typeof branch === 'object' ? branch._id : branch)
+            );
             const branches = await Promise.all(branchPromises);
             setBranchDetails(branches);
           } catch (error) {
@@ -214,12 +216,10 @@ const RestaurantPage = () => {
 
         // Fetch current branch details
         const branchRes = await restaurantService.getBranchById(branchId || restaurantData?.nearestBranchId);
-        console.log('branchRes', branchRes);
         setBranch(branchRes || null);
 
         // Fetch menu for the branch
         const menuResRaw = await restaurantService.getFoodItems(branchId || restaurantData?.nearestBranchId);
-        console.log('menuRes', menuResRaw);
         // If menuResRaw is an object with category keys, use it
         if (menuResRaw && typeof menuResRaw === 'object' && !Array.isArray(menuResRaw)) {
           setMenuRes(menuResRaw);
@@ -262,9 +262,7 @@ const RestaurantPage = () => {
     fetchImage();
   }, [branch]);
 
-  useEffect(() => {
-    console.log('Current cart:', cartItems);
-  }, [cartItems]);
+
 
   useEffect(() => {
     const fetchCartBranch = async () => {
@@ -289,8 +287,8 @@ const RestaurantPage = () => {
     const fetchBranchDetails = async () => {
       if (restaurant?.branches && restaurant.branches.length > 1) {
         try {
-          const branchPromises = restaurant.branches.map(branchId => 
-            restaurantService.getBranchById(branchId)
+          const branchPromises = restaurant.branches.map(branch =>
+            restaurantService.getBranchById(typeof branch === 'object' ? branch._id : branch)
           );
           const branches = await Promise.all(branchPromises);
           setBranchDetails(branches);
@@ -303,6 +301,20 @@ const RestaurantPage = () => {
     };
     fetchBranchDetails();
   }, [restaurant]);
+
+  useEffect(() => {
+    if (!branch || !selectedDeliveryAddress || !selectedDeliveryAddress.coordinates) return;
+    if (!branch.location || !branch.serviceableDistance) return;
+    const [branchLng, branchLat] = branch.location.coordinates;
+    const userLat = selectedDeliveryAddress.coordinates.latitude;
+    const userLng = selectedDeliveryAddress.coordinates.longitude;
+    if (typeof userLat !== 'number' || typeof userLng !== 'number') return;
+    const distance = getDistanceFromLatLonInKm(userLat, userLng, branchLat, branchLng);
+    if (distance > parseFloat(branch.serviceableDistance) && cartItems.length > 0) {
+      // Only clear cart and show snackbar if there are items in the cart
+      clearCart('Your cart was cleared because the selected address is not serviceable by this branch.', 'warning');
+    }
+  }, [selectedDeliveryAddress, branch, cartItems.length]);
 
   const handleOutletChange = async (event) => {
     const newBranchId = event.target.value;
@@ -322,14 +334,8 @@ const RestaurantPage = () => {
         setSelectedCategory('All');
       }
 
-      // Update cart if needed
-      if (cartItems.length > 0) {
-        setCartConflictOpen(true);
-        setPendingCartItem(null);
-      }
-
       // Show success message
-      setSnackbar({
+      handleCloseSnackbar({
         open: true,
         message: 'Outlet changed successfully',
         severity: 'success'
@@ -340,7 +346,7 @@ const RestaurantPage = () => {
 
     } catch (error) {
       console.error('Error updating branch details:', error);
-      setSnackbar({
+      handleCloseSnackbar({
         open: true,
         message: 'Failed to switch outlet. Please try again.',
         severity: 'error'
@@ -354,26 +360,22 @@ const RestaurantPage = () => {
 
   // Update the cart conflict modal to handle outlet changes
   const handleCartConflict = async (clearCart) => {
+    if (isCartConflictLoading) return; // Prevent double execution
+    setIsCartConflictLoading(true);
     if (clearCart) {
       try {
         await cartService.clearCart();
-        setCartLocked(false);
+        if (pendingCartItem) {
+          const newBranchId = pendingCartItem.branchId || selectedOutlet || branchId;
+          await addToCart(pendingCartItem, restaurantId, newBranchId);
+        }
         setPendingCartItem(null);
-        setSnackbar({
-          open: true,
-          message: 'Cart cleared. You can now add items from the new outlet.',
-          severity: 'success'
-        });
       } catch (error) {
-        console.error('Error clearing cart:', error);
-        setSnackbar({
-          open: true,
-          message: 'Failed to clear cart. Please try again.',
-          severity: 'error'
-        });
+        // handle error
       }
     }
     setCartConflictOpen(false);
+    setIsCartConflictLoading(false);
   };
 
   const calculateDistance = (branchLocation) => {
@@ -385,6 +387,15 @@ const RestaurantPage = () => {
       branchLat,
       branchLng
     );
+  };
+
+  // Handler to close variant modal and reset selection
+  const handleCloseVariantModal = () => {
+    setShowVariantModal(false);
+    setSelectedVariant(null);
+    setVariantItem(null);
+    setSelectedAddOns([]); // Reset add-ons if needed
+    setSelectedOptions([]); // Reset options if needed
   };
 
   if (loading) return (
@@ -733,7 +744,7 @@ console.log('branch',branch);
                 mb: 2
               }}>
                 {sortedItems.slice(0, 9).map((item, idx) => {
-                  console.log('Food item:', item);
+ 
                   // If item has variants, set price to first variant's price
                   let displayItem = { ...item };
                   if (displayItem.hasVariants && Array.isArray(displayItem.variants) && displayItem.variants.length > 0) {
@@ -938,6 +949,7 @@ console.log('branch',branch);
                       variant="contained"
                       sx={{ bgcolor: theme.modalButton.primary, color: theme.modalButton.primaryText, borderRadius: theme.modalButton.borderRadius, fontWeight: 600 }}
                       onClick={() => handleCartConflict(true)}
+                      disabled={isCartConflictLoading}
                     >
                       Clear Cart & Continue
                     </Button>
@@ -945,6 +957,7 @@ console.log('branch',branch);
                       variant="outlined"
                       sx={{ color: theme.modalButton.secondaryText, borderColor: theme.modalButton.border, borderRadius: theme.modalButton.borderRadius, fontWeight: 600 }}
                       onClick={() => handleCartConflict(false)}
+                      disabled={isCartConflictLoading}
                     >
                       Keep Current Cart
                     </Button>
@@ -1061,7 +1074,7 @@ console.log('branch',branch);
           </Snackbar>
           <Dialog 
             open={showVariantModal} 
-            onClose={() => setShowVariantModal(false)}
+            onClose={handleCloseVariantModal}
             PaperProps={{
               sx: {
                 bgcolor: theme.modal.background,
@@ -1080,11 +1093,12 @@ console.log('branch',branch);
               borderBottom: `1px solid ${theme.colors.border}`
             }}>
               Select a Variant
-              <IconButton onClick={() => setShowVariantModal(false)} size="small">
+              <IconButton onClick={handleCloseVariantModal} size="small">
                 <CloseIcon />
               </IconButton>
             </DialogTitle>
             <DialogContent sx={{ bgcolor: theme.modal.background, pt: 2 }}>
+              {/* Add-on/option UI can go here. Connect to setSelectedAddOns/setSelectedOptions */}
               {variantItem && variantItem.variants.map((variant) => (
                 <Box 
                   key={variant._id} 
@@ -1123,7 +1137,7 @@ console.log('branch',branch);
               p: 2
             }}>
               <Button 
-                onClick={() => setShowVariantModal(false)}
+                onClick={handleCloseVariantModal}
                 sx={{ 
                   color: theme.colors.secondaryText,
                   '&:hover': { bgcolor: `${theme.colors.secondaryText}10` }
@@ -1134,20 +1148,32 @@ console.log('branch',branch);
               <Button
                 variant="contained"
                 onClick={async () => {
-                  if (!selectedVariant) {
-                    // Show error or alert that variant must be selected
-                    return;
-                  }
-                  const newItem = {
+                  if (!selectedVariant) return;
+                  const currentBranchId = selectedOutlet || branchId;
+                  let newItem = {
                     ...variantItem,
                     price: selectedVariant.price,
                     variant: selectedVariant,
+                    addOns: selectedAddOns,
+                    options: selectedOptions,
                     quantity: 1,
                     restaurantId,
-                    branchId: branchId || restaurant?.nearestBranchId,
+                    branchId: currentBranchId,
                   };
+                  // Cart conflict check for variants as well
+                  if (
+                    cartItems.length > 0 &&
+                    cartRestaurantId === restaurantId &&
+                    cartBranchId !== currentBranchId
+                  ) {
+                    setPendingCartItem(newItem);
+                    setCartConflictOpen(true);
+                    handleCloseVariantModal();
+                    return; // <-- DO NOT call addToCart
+                  }
+                  // No conflict, proceed
                   try {
-                    const result = await addToCart(newItem, restaurantId, branchId || restaurant?.nearestBranchId);
+                    const result = await addToCart(newItem, restaurantId, currentBranchId);
                     if (result && result.conflict) {
                       setPendingCartItem(newItem);
                       setCartConflictOpen(true);
@@ -1155,13 +1181,11 @@ console.log('branch',branch);
                       setRecentlyAddedItem(newItem);
                       setShowAlert(true);
                     }
-                    setShowVariantModal(false);
-                    setSelectedVariant(null);
+                    handleCloseVariantModal();
                   } catch (error) {
                     setCartWarning(error.message || 'Failed to add item to cart');
                     setTimeout(() => setCartWarning(''), 3000);
                   }
-                  setShowVariantModal(false);
                 }}
                 sx={{ 
                   bgcolor: theme.colors.primary,
