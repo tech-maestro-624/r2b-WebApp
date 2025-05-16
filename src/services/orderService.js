@@ -86,8 +86,6 @@ export const orderService = {
       // Place order
       const response = await apiService.post('/order/create', payload);
       console.log('response from order service', response);
-      // Clear cart after successful order placement
-      await cartService.clearCart();
 
       // Save order ID for tracking - Only save if response.order and response.order._id exist
       if (response && response.order && response.order._id) {
@@ -260,6 +258,22 @@ export const orderService = {
     } catch (error) {
       console.error('Get last order ID error:', error);
       return null;
+    }
+  },
+
+  /**
+   * Get all reviews for a branch
+   * @param {string} branchId - Branch ID
+   * @returns {Promise<Array>} - List of reviews for the branch
+   */
+  getReviewsByBranch: async (branchId) => {
+    try {
+      const response = await apiService.get(`/review/branch/${branchId}`);
+      console.log('response from getReviewsByBranch', response);
+      return response;
+    } catch (error) {
+      console.error('Get reviews by branch error:', error);
+      throw error;
     }
   }
 };

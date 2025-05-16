@@ -679,7 +679,14 @@ const HomePage = () => {
                           cursor: 'pointer',
                           '&:hover': { background: `${theme.colors.primary}10` }
                         }}
-                        onClick={() => navigate(`/search?keyword=${encodeURIComponent(searchValue)}`)}
+                        onClick={() => {
+                          const rawKeyword = item.dishName || item.name || searchValue;
+                          const slugKeyword = rawKeyword
+                            .toLowerCase()
+                            .replace(/[^a-z0-9]+/g, '-')
+                            .replace(/^-+|-+$/g, '');
+                          navigate(`/search?keyword=${slugKeyword}`);
+                        }}
                       >
                         <Box>
                           <Typography sx={{ fontWeight: 600, fontSize: 18 }}>{item.dishName}</Typography>

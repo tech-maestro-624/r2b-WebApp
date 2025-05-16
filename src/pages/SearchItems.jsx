@@ -59,7 +59,8 @@ const SearchItems = () => {
         const selected = await locationService.getSelectedAddress();
         coords = selected?.coordinates || null;
       } catch {}
-      const items = await searchFoodItems(keyword, coords);
+      const searchTerm = keyword.replace(/-/g, ' ');
+      const items = await searchFoodItems(searchTerm, coords);
       // Separate dishes and restaurants
       let foundDishes = items.filter(item => item.type === 'dish' || item.dishName);
       console.log('Found dishes from search API:', foundDishes);
@@ -298,14 +299,46 @@ const SearchItems = () => {
         {/* Structured Data */}
         <script type="application/ld+json">{JSON.stringify(searchStructuredData)}</script>
         <script type="application/ld+json">{JSON.stringify(breadcrumbStructuredData)}</script>
+        {keyword && (
+          <script type="application/ld+json">
+            {JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "FAQPage",
+              "mainEntity": [
+                {
+                  "@type": "Question",
+                  "name": `Where can I order ${keyword} online?`,
+                  "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": `You can order ${keyword} from top-rated restaurants on Roll2Bowl with fast delivery and exclusive offers.`
+                  }
+                },
+                {
+                  "@type": "Question",
+                  "name": `Which restaurants serve the best ${keyword}?`,
+                  "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": `Browse our list of restaurants serving delicious ${keyword} near you, complete with ratings and reviews.`
+                  }
+                }
+              ]
+            })}
+          </script>
+        )}
       </Helmet>
       {/* Visually hidden SEO heading and paragraph */}
-      <h1 style={visuallyHidden}>{seoTitle}</h1>
-      <p style={visuallyHidden}>{seoDescription}</p>
+      <h1 style={{position:'absolute',left:'-9999px',height:'1px',width:'1px',overflow:'hidden'}}>
+        {keyword ? `Search results for "${keyword.replace(/-/g, ' ')}"` : 'Search Results'}
+      </h1>
+      {keyword && (
+        <p style={{position:'absolute',left:'-9999px',height:'1px',width:'1px',overflow:'hidden'}}>
+          Discover the best places to order {keyword} online in your city. See top-rated restaurants, prices, and delivery options for {keyword} on Roll2Bowl.
+        </p>
+      )}
       <div style={{ minHeight: '100vh', background: theme.colors.background, color: theme.colors.text, fontFamily: 'Trebuchet MS, Arial, sans-serif' }}>
         <Box sx={{ width: '100%', py: 6, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', maxWidth: 1600, mx: 'auto', px: 4 }}>
           <Typography variant="h4" sx={{ fontWeight: 700, color: theme.colors.text, mb: 3 }}>
-            {keyword ? `Search results for "${keyword}"` : 'Search Results'}
+            {keyword ? `Search results for "${keyword.replace(/-/g, ' ')}"` : 'Search Results'}
           </Typography>
           <Box sx={{ display: 'flex', gap: 2, mb: 4 }}>
             <Button
@@ -478,90 +511,15 @@ const SearchItems = () => {
                     </CardContent>
                   </Card>
                 );
-              }) : staticDishes.map(dish => (
-                <Card
-                  key={dish.id}
-                  sx={{
-                    bgcolor: theme.colors.card,
-                    color: theme.colors.text,
-                    borderRadius: 3,
-                    boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
-                    p: 0,
-                    m: 0,
-                    overflow: 'hidden',
-                    display: 'flex',
-                    flexDirection: 'row',
-                    alignItems: 'stretch',
-                    minHeight: 170,
-                    maxWidth: 440,
-                    width: '100%',
-                    transition: 'box-shadow 0.2s, transform 0.2s',
-                    '&:hover': { boxShadow: '0 4px 16px rgba(0,0,0,0.13)', transform: 'translateY(-2px) scale(1.03)' }
-                  }}
-                >
-                  {/* Dish Image */}
-                  <Box sx={{ width: 140, height: 150, borderRadius: 2, overflow: 'hidden', border: '1.5px solid #bdbdbd', m: 2, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: theme.colors.card }}>
-                    <img src={dish.image} alt={dish.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
-                  </Box>
-                  {/* Dish Details */}
-                  <CardContent sx={{ p: 2, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                      <Typography
-                        sx={{ fontWeight: 700, fontSize: 20, color: dish.isAvailable === false ? theme.colors.text : theme.colors.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 200, lineHeight: 1 }}
-                        noWrap
-                      >
-                        {dish.name}
-                      </Typography>
-                      {/* Veg/Non-Veg Icon at end of title */}
-                      <Box
-                        sx={{
-                          width: 20,
-                          height: 20,
-                          border: '2px solid',
-                          borderColor: dish.dishType === 'veg' ? '#43a047' : '#e53935',
-                          borderRadius: 0,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          background: '#fff',
-                          boxSizing: 'border-box',
-                          ml: 1
-                        }}
-                      >
-                        <Box
-                          sx={{
-                            width: 12,
-                            height: 12,
-                            borderRadius: '50%',
-                            background: dish.dishType === 'veg' ? '#43a047' : '#e53935',
-                          }}
-                        />
-                      </Box>
-                    </Box>
-                    {dish.restaurantName || dish.restaurant ? (
-                      <Typography sx={{ color: theme.colors.secondaryText, fontSize: 14, mb: 0.5 }}>
-                        {dish.restaurantName || dish.restaurant}
-                      </Typography>
-                    ) : null}
-                    <Typography sx={{ color: theme.colors.secondaryText, fontSize: 15, mb: 1 }}>
-                      {dish.description}
-                    </Typography>
-                    <Typography sx={{ color: theme.colors.text, fontSize: 16, mb: 1, fontWeight: 500 }}>
-                      {dish.category && dish.category.name ? dish.category.name : ''}
-                    </Typography>
-                    <Typography sx={{ fontWeight: 700, color: theme.colors.primary, fontSize: 18, mb: 1 }}>
-                      ₹{dish.hasVariants && Array.isArray(dish.variants) && dish.variants.length > 0 ? dish.variants[0].price : dish.price}
-                    </Typography>
-                    <Button variant="contained" color="warning" sx={{ fontWeight: 600, borderRadius: 2, width: 140, mt: 'auto' }}>
-                      Add to Cart
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
+              }) : (
+                <Typography sx={{ color: theme.colors.secondaryText, fontSize: 18, mt: 4 }}>
+                  No dishes found for "{keyword}".
+                </Typography>
+              )}
             </Box>
           ) : (
             <Box sx={{ width: '100%', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', columnGap: '12px', rowGap: '12px', justifyItems: 'center' }}>
-              {restaurants.map(rest => {
+              {restaurants.length ? restaurants.map(rest => {
                 const notServiceable = typeof rest.distanceInKm === 'number' && typeof rest.serviceableDistance === 'number' && rest.distanceInKm > rest.serviceableDistance;
                 const restaurantId = rest.restaurant?._id;
                 const branchId = rest._id;
@@ -625,7 +583,11 @@ const SearchItems = () => {
                     </Box>
                   </Card>
                 );
-              })}
+              }) : (
+                <Typography sx={{ color: theme.colors.secondaryText, fontSize: 18, mt: 4 }}>
+                  No restaurants found for "{keyword}".
+                </Typography>
+              )}
             </Box>
           )}
         </Box>

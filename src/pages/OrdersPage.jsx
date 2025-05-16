@@ -17,7 +17,6 @@ import ListItem from '@mui/material/ListItem';
 import ListItemAvatar from '@mui/material/ListItemAvatar';
 import ListItemText from '@mui/material/ListItemText';
 import Avatar from '@mui/material/Avatar';
-import Grid from '@mui/material/Grid';
 import CircularProgress from '@mui/material/CircularProgress';
 import { orderService } from '../services/orderService';
 import { ThemeContext } from '../context/ThemeContext.jsx';
@@ -32,6 +31,17 @@ import { useAuthModal } from '../context/AuthModalContext';
 import StarIcon from '@mui/icons-material/Star';
 import TextField from '@mui/material/TextField';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import { restaurantService } from '../services/restaurantService';
+
+// Utility function to slugify names for URLs
+function slugify(str) {
+  return (str || '')
+    .toString()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .replace(/--+/g, '-');
+}
 
 const OrdersPage = () => {
   const [tab, setTab] = useState(0);
@@ -53,6 +63,7 @@ const OrdersPage = () => {
   const [orderToRate, setOrderToRate] = useState(null);
   const [rating, setRating] = useState(0);
   const [review, setReview] = useState('');
+  const [reviewedOrderIds, setReviewedOrderIds] = useState([]);
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -139,9 +150,32 @@ const OrdersPage = () => {
         options: item.options || []
       }));
 
-      // Get restaurant and branch IDs
+      // Get restaurant and branch IDs and names
       const restaurantId = order.branch?.restaurant || order.restaurant?._id || order.restaurantId;
+      console.log('restaurantId', restaurantId);
       const branchId = order.branch?._id || order.branchId;
+      console.log('branchId', branchId);
+      
+      let restaurantName = order.restaurant?.name || order.restaurantName || '';
+      if (!restaurantName && restaurantId) {
+        // Fetch restaurant name from API if not present
+        try {
+          const restRes = await restaurantService.getRestaurantById(restaurantId);
+          restaurantName = restRes?.restaurant?.name || restRes?.name || '';
+        } catch (e) {
+          restaurantName = '';
+        }
+      }
+      let branchName = order.branch?.name || order.branch?.branchName || order.branchName || '';
+      if (!branchName && branchId) {
+        // Fetch branch name from API if not present
+        try {
+          const branchRes = await restaurantService.getBranchById(branchId);
+          branchName = branchRes?.name || branchRes?.branchName || branchRes?.branch?.name || branchRes?.branch?.branchName || '';
+        } catch (e) {
+          branchName = '';
+        }
+      }
 
       if (!restaurantId || !branchId) {
         throw new Error('Missing restaurant or branch ID');
@@ -185,8 +219,11 @@ const OrdersPage = () => {
         severity: 'success'
       });
 
-      // Navigate to restaurant page with correct URL format
-      navigate(`/restaurant/${restaurantId}/${branchId}`);
+      // Navigate to restaurant page with modern URL
+      const restSlug = slugify(restaurantName) || restaurantId;
+      console.log('restSlug', restSlug);
+      const branchSlug = branchName ? slugify(branchName) : branchId;
+      navigate(`/restaurant/${restSlug}/${branchSlug}`, { state: { restaurantId, branchId } });
     } catch (error) {
       console.error('Error reordering:', error);
       setSnackbar({
@@ -226,8 +263,33 @@ const OrdersPage = () => {
           severity: 'success'
         });
 
-        // Navigate to restaurant page
-        navigate(`/restaurant/${pendingRestaurantId}/${pendingBranchId}`);
+        // Navigate to restaurant page with modern URL
+        let restaurantName = '';
+        let branchName = '';
+        if (pendingCartItem && pendingCartItem.length > 0) {
+          restaurantName = pendingCartItem[0].restaurantName || (pendingCartItem[0].restaurant && pendingCartItem[0].restaurant.name) || '';
+          branchName = pendingCartItem[0].branchName || (pendingCartItem[0].branch && (pendingCartItem[0].branch.name || pendingCartItem[0].branch.branchName)) || '';
+        }
+        if (!restaurantName && pendingRestaurantId) {
+          try {
+            const restRes = await restaurantService.getRestaurantById(pendingRestaurantId);
+            restaurantName = restRes?.restaurant?.name || restRes?.name || '';
+          } catch (e) {
+            restaurantName = '';
+          }
+        }
+        if (!branchName && pendingBranchId) {
+          try {
+            const branchRes = await restaurantService.getBranchById(pendingBranchId);
+            branchName = branchRes?.name || branchRes?.branchName || branchRes?.branch?.name || branchRes?.branch?.branchName || '';
+          } catch (e) {
+            branchName = '';
+          }
+        }
+        // Fallback to IDs if names are not available
+        const restSlug = slugify(restaurantName) || pendingRestaurantId;
+        const branchSlug = branchName ? slugify(branchName) : pendingBranchId;
+        navigate(`/restaurant/${restSlug}/${branchSlug}`, { state: { restaurantId: pendingRestaurantId, branchId: pendingBranchId } });
       }
       
       // Close the conflict modal
@@ -275,8 +337,15 @@ const OrdersPage = () => {
         feedback: review
       });
       setSnackbar({ open: true, message: 'Thank you for your review!', severity: 'success' });
+      setReviewedOrderIds(prev => [...prev, orderToRate._id || orderToRate.orderId]);
     } catch (e) {
-      setSnackbar({ open: true, message: 'Failed to submit review. Please try again.', severity: 'error' });
+      // Check for duplicate review error
+      const msg = e?.message || '';
+      if (msg.includes('duplicate key error') || msg.includes('E11000')) {
+        setSnackbar({ open: true, message: 'Review for this order is already submitted.', severity: 'error' });
+      } else {
+        setSnackbar({ open: true, message: 'Failed to submit review. Please try again.', severity: 'error' });
+      }
     }
     setRateModalOpen(false);
     setOrderToRate(null);
@@ -290,62 +359,63 @@ const OrdersPage = () => {
 
   const renderOrderCard = (order, idx) => {
     const isDelivered = (order.status || '').toLowerCase() === 'delivered';
-    const showActions = tab === 1 && isDelivered; // Only show in History tab for delivered orders
+    const isReviewed = reviewedOrderIds.includes(order._id || order.orderId);
+    const showActions = tab === 1 && isDelivered;
     return (
       <Box sx={{ display: 'flex', flexDirection: 'column', mb: 2 }}>
-    <Card
-      key={order._id || idx}
-      sx={{ 
-        display: 'flex', 
-        flexDirection: 'row', 
-        alignItems: 'center', 
-        boxShadow: theme.isDarkMode ? '0 2px 8px rgba(0,0,0,0.2)' : '0 2px 8px rgba(0,0,0,0.07)', 
-        borderRadius: 2, 
-        p: 1, 
-        cursor: 'pointer', 
-        transition: 'all 0.2s ease-in-out', 
-        '&:hover': { 
-          boxShadow: theme.isDarkMode ? '0 4px 16px rgba(0,0,0,0.3)' : '0 4px 16px rgba(0,0,0,0.13)',
-          transform: 'translateY(-2px)'
-        }, 
-        minHeight: 180, 
-        height: 180, 
-        background: theme.colors.card, 
-        color: theme.colors.text, 
-        border: `1.5px solid ${theme.colors.border}` 
-      }}
-      onClick={() => handleCardClick(order)}
-    >
-      <CardMedia
-        component="img"
-        image={order.restaurantImage || order.restaurant?.image || order.items?.[0]?.foodItem?.imageUrl || 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=80&q=80'}
-        alt={order.restaurantName || order.restaurant?.name || 'Restaurant'}
-        sx={{ height: '100%', width: 180, minWidth: 180, borderRadius: 2, objectFit: 'cover', mr: 2 }}
-      />
-      <CardContent sx={{ display: 'flex', flexDirection: 'column', p: 1, flex: 1 }}>
-        <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5, color: theme.colors.text, fontSize: 18 }}>{order.branch?.name || order.restaurantName || order.restaurant?.name || 'Restaurant'}</Typography>
-        <Typography sx={{ color: theme.colors.secondaryText, fontWeight: 600, fontSize: 14, mb: 0.5 }}>
-          Order ID: {order.orderId}
-        </Typography>
-        <Box sx={{ color: theme.colors.secondaryText, fontSize: 13, mb: 0.5, display: 'flex', flexDirection: 'column', gap: 0.2 }}>
-          {order.items && order.items.length > 0
-            ? order.items.map((item, i) => (
-                <span key={i}>{item.foodItem?.name || item.name} x {item.quantity}</span>
-              ))
-            : null}
-        </Box>
-        <Typography sx={{ color: theme.colors.primary, fontWeight: 700, fontSize: 15, mb: 0.5 }}>
-          ₹{order.grandTotal ? Math.round(order.grandTotal) : (order.total || order.amount || 0)}
-        </Typography>
-        <Typography sx={{ 
-          color: (order.status || '').toLowerCase() === 'delivered' ? theme.colors.success : theme.colors.primary, 
-          fontWeight: 500, 
-          fontSize: 13 
-        }}>
-          {order.status}
-        </Typography>
-      </CardContent>
-    </Card>
+        <Card
+          key={order._id || idx}
+          sx={{ 
+            display: 'flex', 
+            flexDirection: 'row', 
+            alignItems: 'center', 
+            boxShadow: theme.isDarkMode ? '0 2px 8px rgba(0,0,0,0.2)' : '0 2px 8px rgba(0,0,0,0.07)', 
+            borderRadius: 2, 
+            p: 1, 
+            cursor: 'pointer', 
+            transition: 'all 0.2s ease-in-out', 
+            '&:hover': { 
+              boxShadow: theme.isDarkMode ? '0 4px 16px rgba(0,0,0,0.3)' : '0 4px 16px rgba(0,0,0,0.13)',
+              transform: 'translateY(-2px)'
+            }, 
+            minHeight: 180, 
+            height: 180, 
+            background: theme.colors.card, 
+            color: theme.colors.text, 
+            border: `1.5px solid ${theme.colors.border}` 
+          }}
+          onClick={() => handleCardClick(order)}
+        >
+          <CardMedia
+            component="img"
+            image={order.restaurantImage || order.restaurant?.image || order.items?.[0]?.foodItem?.imageUrl || 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=80&q=80'}
+            alt={order.restaurantName || order.restaurant?.name || 'Restaurant'}
+            sx={{ height: '100%', width: 180, minWidth: 180, borderRadius: 2, objectFit: 'cover', mr: 2 }}
+          />
+          <CardContent sx={{ display: 'flex', flexDirection: 'column', p: 1, flex: 1 }}>
+            <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5, color: theme.colors.text, fontSize: 18 }}>{order.branch?.name || order.restaurantName || order.restaurant?.name || 'Restaurant'}</Typography>
+            <Typography sx={{ color: theme.colors.secondaryText, fontWeight: 600, fontSize: 14, mb: 0.5 }}>
+              Order ID: {order.orderId}
+            </Typography>
+            <Box sx={{ color: theme.colors.secondaryText, fontSize: 13, mb: 0.5, display: 'flex', flexDirection: 'column', gap: 0.2 }}>
+              {order.items && order.items.length > 0
+                ? order.items.map((item, i) => (
+                    <span key={i}>{item.foodItem?.name || item.name} x {item.quantity}</span>
+                  ))
+                : null}
+            </Box>
+            <Typography sx={{ color: theme.colors.primary, fontWeight: 700, fontSize: 15, mb: 0.5 }}>
+              ₹{order.grandTotal ? Math.round(order.grandTotal) : (order.total || order.amount || 0)}
+            </Typography>
+            <Typography sx={{ 
+              color: (order.status || '').toLowerCase() === 'delivered' ? theme.colors.success : theme.colors.primary, 
+              fontWeight: 500, 
+              fontSize: 13 
+            }}>
+              {order.status}
+            </Typography>
+          </CardContent>
+        </Card>
         {showActions && (
           <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
             <Button
@@ -363,6 +433,7 @@ const OrdersPage = () => {
                 e.stopPropagation();
                 handleOpenRateModal(order);
               }}
+              disabled={isReviewed}
             >
               Rate
             </Button>

@@ -35,6 +35,9 @@ import OutlinedInput from '@mui/material/OutlinedInput';
 import { Helmet } from 'react-helmet';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { useDeliveryAddress } from '../context/DeliveryAddressContext';
+import TextField from '@mui/material/TextField';
+import { orderService } from '../services/orderService';
+import axios from 'axios';
 
 function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
   const R = 6371; // Radius of the earth in km
@@ -83,6 +86,16 @@ const RestaurantPage = () => {
   const [isCartConflictLoading, setIsCartConflictLoading] = useState(false);
   const [selectedAddOns, setSelectedAddOns] = useState([]); // For add-ons
   const [selectedOptions, setSelectedOptions] = useState([]); // For options
+  const [sortBy, setSortBy] = useState('');
+  const [menuFilter, setMenuFilter] = useState('all');
+  const [reviewsOpen, setReviewsOpen] = useState(false);
+  const [reviewInput, setReviewInput] = useState('');
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewSnackbar, setReviewSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [branchReviews, setBranchReviews] = useState([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewsError, setReviewsError] = useState('');
+  const initialOutletSet = React.useRef(false);
 
   // Get user coordinates from localStorage
   let userCoords = null;
@@ -193,12 +206,15 @@ const RestaurantPage = () => {
         const restRes = await restaurantService.getRestaurantById(restaurantId);
         const restaurantData = restRes?.restaurant || restRes || null;
         setRestaurant(restaurantData);
-        
-        // Set initial selected outlet to branch from state
-        if (branchId) {
-          setSelectedOutlet(branchId);
-        } else if (restaurantData?.nearestBranchId) {
-          setSelectedOutlet(restaurantData.nearestBranchId);
+        console.log('restaurantData:',restaurantData);
+        // Set initial selected outlet to branch from state, but only once
+        if (!initialOutletSet.current) {
+          if (branchId) {
+            setSelectedOutlet(branchId);
+          } else if (restaurantData?.nearestBranchId) {
+            setSelectedOutlet(restaurantData.nearestBranchId);
+          }
+          initialOutletSet.current = true;
         }
 
         // Fetch branch details if restaurant has multiple branches
@@ -292,8 +308,6 @@ const RestaurantPage = () => {
           );
           const branches = await Promise.all(branchPromises);
           setBranchDetails(branches);
-          // Set initial selected outlet to nearest branch
-          setSelectedOutlet(restaurant.nearestBranchId);
         } catch (error) {
           console.error('Error fetching branch details:', error);
         }
@@ -318,6 +332,10 @@ const RestaurantPage = () => {
 
   const handleOutletChange = async (event) => {
     const newBranchId = event.target.value;
+    if (newBranchId === selectedOutlet) {
+      // Do nothing if the selected outlet is already active
+      return;
+    }
     setSelectedOutlet(newBranchId);
     setLoading(true); // Show loading state while changing outlet
 
@@ -398,6 +416,21 @@ const RestaurantPage = () => {
     setSelectedOptions([]); // Reset options if needed
   };
 
+  useEffect(() => {
+    if (reviewsOpen && branch?._id) {
+      setReviewsLoading(true);
+      setReviewsError('');
+      orderService.getReviewsByBranch(branch._id)
+        .then(res => {
+          setBranchReviews(res.data || res || []);
+        })
+        .catch(err => {
+          setReviewsError('Failed to load reviews.');
+        })
+        .finally(() => setReviewsLoading(false));
+    }
+  }, [reviewsOpen, branch?._id]);
+
   if (loading) return (
     <Box sx={{
       minHeight: '100vh',
@@ -420,19 +453,39 @@ console.log('branch',branch);
     ? Object.values(menuRes).flat() 
     : (selectedCategory && menuRes[selectedCategory] ? menuRes[selectedCategory] : []);
 
-  const sortedItems = [...itemsForSelectedCategory].sort((a, b) => {
+  const filteredItems = itemsForSelectedCategory.filter(item => {
+    if (menuFilter === 'all') return true;
+    if (menuFilter === 'veg') return item.dishType === 'veg';
+    if (menuFilter === 'nonveg') return item.dishType === 'non-veg';
+    if (menuFilter === 'egg') return item.dishType === 'egg';
+    return true;
+  });
+
+  const sortedItems = [...filteredItems].sort((a, b) => {
     // Helper to check if item is serviceable
     const isServiceable = (item) => {
       if (!branch || !branch.location || !branch.serviceableDistance) return true;
       const distance = calculateDistance(branch.location);
       return !(distance && parseFloat(distance) > parseFloat(branch.serviceableDistance));
     };
-    // First: available and serviceable
-    const aAvailable = a.isAvailable === true && isServiceable(a);
-    const bAvailable = b.isAvailable === true && isServiceable(b);
-    if (aAvailable === bAvailable) return 0;
-    return aAvailable ? -1 : 1;
+    // Sort logic
+    if (sortBy === 'priceLowHigh') {
+      return (a.price || 0) - (b.price || 0);
+    } else if (sortBy === 'priceHighLow') {
+      return (b.price || 0) - (a.price || 0);
+    } else {
+      // Recommended: available and serviceable first
+      const aAvailable = a.isAvailable === true && isServiceable(a);
+      const bAvailable = b.isAvailable === true && isServiceable(b);
+      if (aAvailable === bAvailable) return 0;
+      return aAvailable ? -1 : 1;
+    }
   });
+
+  // Calculate average rating from branchReviews
+  const averageRating = branchReviews.length
+    ? (branchReviews.reduce((sum, r) => sum + (r.rating || 0), 0) / branchReviews.length).toFixed(1)
+    : null;
 
   const seoTitle = branch && restaurant ? `${branch.name} | ${restaurant.name} | Menu, Reviews & Delivery | Roll2Bowl` : 'Restaurant | Roll2Bowl';
   const seoDescription = branch && restaurant ? `Order from ${branch.name}, ${restaurant.name} on Roll2Bowl. View menu, reviews, delivery info, and enjoy fast food delivery in your area.` : 'Order from top restaurants on Roll2Bowl. View menu, reviews, and enjoy fast food delivery.';
@@ -515,12 +568,42 @@ console.log('branch',branch);
         {/* Structured Data */}
         {businessStructuredData && <script type="application/ld+json">{JSON.stringify(businessStructuredData)}</script>}
         <script type="application/ld+json">{JSON.stringify(breadcrumbStructuredData)}</script>
+        {restaurant && branch && menuRes && Object.values(menuRes).flat().length > 0 && (
+          <script type="application/ld+json">
+            {JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "FAQPage",
+              "mainEntity": [
+                {
+                  "@type": "Question",
+                  "name": `Where can I order ${Object.values(menuRes).flat()[0].name} at ${branch.name}?`,
+                  "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": `You can order ${Object.values(menuRes).flat()[0].name} and other dishes from ${branch.name}, ${restaurant.name} on Roll2Bowl with fast delivery and exclusive offers.`
+                  }
+                },
+                {
+                  "@type": "Question",
+                  "name": `What is the specialty of ${branch.name}, ${restaurant.name}?`,
+                  "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": `${restaurant.description || 'This restaurant offers a variety of delicious dishes.'}`
+                  }
+                }
+              ]
+            })}
+          </script>
+        )}
       </Helmet>
       {/* Accessible skip-to-menu link: visually hidden but focusable */}
       <a href="#menu-section" style={{position:'absolute',left:'-9999px',height:'1px',width:'1px',overflow:'hidden'}} tabIndex={0} onFocus={e => {e.target.style.position='static';e.target.style.height='auto';e.target.style.width='auto';e.target.style.overflow='visible';}} onBlur={e => {e.target.style.position='absolute';e.target.style.left='-9999px';e.target.style.height='1px';e.target.style.width='1px';e.target.style.overflow='hidden';}}>Skip to Menu</a>
       {/* Visually hidden SEO heading and paragraph */}
-      <h1 style={{position:'absolute',left:'-9999px',height:'1px',width:'1px',overflow:'hidden'}}>{seoTitle}</h1>
-      <p style={{position:'absolute',left:'-9999px',height:'1px',width:'1px',overflow:'hidden'}}>{seoDescription}</p>
+      <h1 style={{position:'absolute',left:'-9999px',height:'1px',width:'1px',overflow:'hidden'}}>
+        {branch && restaurant ? `${branch.name} | ${restaurant.name} Menu, Reviews & Delivery` : 'Restaurant | Roll2Bowl'}
+      </h1>
+      <p style={{position:'absolute',left:'-9999px',height:'1px',width:'1px',overflow:'hidden'}}>
+        {branch && restaurant ? `Order from ${branch.name}, ${restaurant.name} on Roll2Bowl. View menu, reviews, delivery info, and enjoy fast food delivery in your area.` : 'Order from top restaurants on Roll2Bowl. View menu, reviews, and enjoy fast food delivery.'}
+      </p>
       {/* Visually hidden h2 for Menu section */}
       <h2 id="menu-section" style={{position:'absolute',left:'-9999px',height:'1px',width:'1px',overflow:'hidden'}}>Menu</h2>
       <Box
@@ -543,16 +626,34 @@ console.log('branch',branch);
                 <Box sx={{ flex: 1 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
                     <Typography variant="h4" sx={{ fontWeight: 700, color: theme.colors.text, fontFamily: theme.typography.fontFamily.bold, fontSize: { xs: '1.2rem', sm: '1.5rem', md: '1.7rem', lg: '2rem' } }}>
-                      {branch ? `${branch.name} (${calculateDistance(branch.location)} km)` : 'Branch'}
+                     {branch ? `${branch.name} (${calculateDistance(branch.location)} km)` : 'Branch'}
                   </Typography>
                   </Box>
-                  <Typography variant="body2" sx={{ mb: 1, color: theme.colors.secondaryText }}>
+                  <Typography variant="h6" sx={{ mb: 1, color: theme.colors.text, fontWeight: 500, fontSize: { xs: '1.1rem', sm: '1.2rem', md: '1.25rem', lg: '1.3rem' } }}>
+                    {restaurant?.description}
+                  </Typography>
+                  <Typography variant="body1" sx={{ mb: 1, color: theme.colors.secondaryText, fontWeight: 500, fontSize: { xs: '1.05rem', sm: '1.12rem', md: '1.15rem', lg: '1.18rem' } }}>
                     {branch ? branch.address : 'No address available'}
                   </Typography>
                   {branch && branch.city && (
-                    <Typography variant="body2" sx={{ mb: 1, color: theme.colors.secondaryText }}>
-                      {branch.city}
-                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+                      <Typography variant="body1" sx={{ mb: 0, color: '#000', fontWeight: 500, fontSize: { xs: '1.05rem', sm: '1.12rem', md: '1.15rem', lg: '1.18rem' } }}>
+                        {branch.city}
+                      </Typography>
+                      {/* Dummy Ratings */}
+                      <Box sx={{ display: 'flex', alignItems: 'center', bgcolor: theme.colors.card, borderRadius: 2, px: 1.5, py: 0.5, border: `1px solid ${theme.colors.primary}` }}>
+                        <Typography sx={{ fontWeight: 700, color: '#000', fontSize: 16, mr: 0.5 }}>
+                          {averageRating || '—'}
+                        </Typography>
+                        <span style={{ color: '#FFD700', fontSize: 18, fontWeight: 700, marginRight: 4 }}>★</span>
+                      </Box>
+                      {/* See Reviews Button */}
+                      <Button variant="outlined" size="small" sx={{ color: '#000', borderColor: theme.colors.primary, fontWeight: 600, borderRadius: 2, ml: 1, px: 2, py: 0.5, fontSize: 14, textTransform: 'none', '&:hover': { bgcolor: `${theme.colors.primary}10`, borderColor: theme.colors.primary, color: '#000' } }}
+                        onClick={() => setReviewsOpen(true)}
+                      >
+                        See Reviews
+                      </Button>
+                    </Box>
                   )}
                   {/* Tags */}
                   {Array.isArray(restaurant?.tags) && restaurant.tags.length > 0 && (
@@ -564,24 +665,10 @@ console.log('branch',branch);
                       ))}
                     </Box>
                   )}
-                  {/* Delivery Info */}
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-                    <Typography variant="body2" sx={{ color: theme.colors.secondaryText }}>
-                      :motor_scooter: {restaurant?.deliveryFee ? `₹${restaurant.deliveryFee}` : 'Free Delivery'}
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: theme.colors.secondaryText }}>
-                      :stopwatch: {restaurant?.deliveryTime || '30-45 mins'}
-                    </Typography>
-                  </Box>
-                  {/* Rating */}
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Typography variant="body2" sx={{ color: theme.colors.secondaryText }}>:star:</Typography>
-                    <Typography variant="body2" sx={{ color: theme.colors.secondaryText }}>
-                      {restaurant?.rating || 4.0} ({restaurant?.reviewCount || 0}+)
-                    </Typography>
-                  </Box>
-                  {Array.isArray(restaurant?.branches) && restaurant.branches.length > 1 && (
-                    <Box sx={{ display: 'flex', justifyContent: 'flex-start', mt: 3, width: '100%' }}>
+
+                  {/* Sort By Dropdown */}
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 3, width: '100%' }}>
+                    {Array.isArray(restaurant?.branches) && restaurant.branches.length > 1 && (
                       <FormControl
                         size="small"
                         variant="outlined"
@@ -595,9 +682,16 @@ console.log('branch',branch);
                           onChange={handleOutletChange}
                           displayEmpty
                           input={<OutlinedInput notched label="" />}
+                          renderValue={(selected) => {
+                            if (!selected) {
+                              return <em>Select an Outlet</em>;
+                            }
+                            const selectedBranch = branchDetails.find(b => b._id === selected);
+                            return selectedBranch ? selectedBranch.name : <em>Select an Outlet</em>;
+                          }}
                           sx={{
                             bgcolor: 'transparent',
-                            color: theme.colors.text,
+                            color: theme.colors.primary,
                             height: 40,
                             boxShadow: 'none',
                             '& .MuiOutlinedInput-notchedOutline': {
@@ -616,6 +710,7 @@ console.log('branch',branch);
                               fontFamily: theme.typography.fontFamily.medium,
                               fontSize: '0.95rem',
                               padding: '8px 14px',
+                              color: theme.colors.primary,
                             },
                           }}
                           MenuProps={{
@@ -634,6 +729,7 @@ console.log('branch',branch);
                                   },
                                   '&.Mui-selected': {
                                     bgcolor: `${theme.colors.primary}20`,
+                                    color: theme.colors.primary,
                                     '&:hover': {
                                       bgcolor: `${theme.colors.primary}30`,
                                     },
@@ -687,8 +783,134 @@ console.log('branch',branch);
                           })}
                         </Select>
                       </FormControl>
-                    </Box>
-                  )}
+                    )}
+                    {/* Sort By Dropdown */}
+                    <FormControl size="small" variant="outlined" sx={{ minWidth: 180, background: theme.colors.inputBackground }}>
+                      <Select
+                        value={sortBy || ''}
+                        onChange={e => setSortBy(e.target.value)}
+                        displayEmpty
+                        input={<OutlinedInput notched label="" />}
+                        sx={{
+                          bgcolor: 'transparent',
+                          color: theme.colors.primary,
+                          height: 40,
+                          boxShadow: 'none',
+                          '& .MuiOutlinedInput-notchedOutline': {
+                            border: '1.5px solid #FF5A33',
+                          },
+                          '&:hover .MuiOutlinedInput-notchedOutline': {
+                            border: '1.5px solid #FF5A33',
+                          },
+                          '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                            border: '1.5px solid #FF5A33',
+                          },
+                          '& .MuiSelect-icon': {
+                            color: theme.colors.primary,
+                          },
+                          '& .MuiSelect-select': {
+                            fontFamily: theme.typography.fontFamily.medium,
+                            fontSize: '0.95rem',
+                            padding: '8px 14px',
+                            color: theme.colors.primary,
+                          },
+                        }}
+                        MenuProps={{
+                          PaperProps: {
+                            sx: {
+                              bgcolor: theme.colors.card,
+                              color: theme.colors.text,
+                              mt: 1,
+                              boxShadow: theme.modal.boxShadow,
+                              '& .MuiMenuItem-root': {
+                                fontFamily: theme.typography.fontFamily.regular,
+                                fontSize: '0.95rem',
+                                padding: '10px 16px',
+                                '&:hover': {
+                                  bgcolor: `${theme.colors.primary}10`,
+                                },
+                                '&.Mui-selected': {
+                                  bgcolor: `${theme.colors.primary}20`,
+                                  color: theme.colors.primary,
+                                  '&:hover': {
+                                    bgcolor: `${theme.colors.primary}30`,
+                                  },
+                                },
+                              },
+                            },
+                          },
+                        }}
+                      >
+                        <MenuItem value="" disabled>Sort By</MenuItem>
+                        <MenuItem value="recommended">Recommended</MenuItem>
+                        <MenuItem value="priceLowHigh">Price - Low to High</MenuItem>
+                        <MenuItem value="priceHighLow">Price - High to Low</MenuItem>
+                      </Select>
+                    </FormControl>
+                    {/* Menu Filter Dropdown */}
+                    <FormControl size="small" variant="outlined" sx={{ minWidth: 140, background: theme.colors.inputBackground }}>
+                      <Select
+                        value={menuFilter}
+                        onChange={e => setMenuFilter(e.target.value)}
+                        displayEmpty
+                        input={<OutlinedInput notched label="" />}
+                        sx={{
+                          bgcolor: 'transparent',
+                          color: theme.colors.primary,
+                          height: 40,
+                          boxShadow: 'none',
+                          '& .MuiOutlinedInput-notchedOutline': {
+                            border: '1.5px solid #FF5A33',
+                          },
+                          '&:hover .MuiOutlinedInput-notchedOutline': {
+                            border: '1.5px solid #FF5A33',
+                          },
+                          '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                            border: '1.5px solid #FF5A33',
+                          },
+                          '& .MuiSelect-icon': {
+                            color: theme.colors.primary,
+                          },
+                          '& .MuiSelect-select': {
+                            fontFamily: theme.typography.fontFamily.medium,
+                            fontSize: '0.95rem',
+                            padding: '8px 14px',
+                            color: theme.colors.primary,
+                          },
+                        }}
+                        MenuProps={{
+                          PaperProps: {
+                            sx: {
+                              bgcolor: theme.colors.card,
+                              color: theme.colors.text,
+                              mt: 1,
+                              boxShadow: theme.modal.boxShadow,
+                              '& .MuiMenuItem-root': {
+                                fontFamily: theme.typography.fontFamily.regular,
+                                fontSize: '0.95rem',
+                                padding: '10px 16px',
+                                '&:hover': {
+                                  bgcolor: `${theme.colors.primary}10`,
+                                },
+                                '&.Mui-selected': {
+                                  bgcolor: `${theme.colors.primary}20`,
+                                  color: theme.colors.primary,
+                                  '&:hover': {
+                                    bgcolor: `${theme.colors.primary}30`,
+                                  },
+                                },
+                              },
+                            },
+                          },
+                        }}
+                      >
+                        <MenuItem value="all">All</MenuItem>
+                        <MenuItem value="veg">Veg</MenuItem>
+                        <MenuItem value="nonveg">Non Veg</MenuItem>
+                        <MenuItem value="egg">Egg</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Box>
                 </Box>
                 {/* Right: Restaurant Image from branch.restaurant.image */}
                 {branchRestaurantImage && (
@@ -1197,6 +1419,61 @@ console.log('branch',branch);
               </Button>
             </DialogActions>
           </Dialog>
+          <Dialog open={reviewsOpen} onClose={() => setReviewsOpen(false)} maxWidth="sm" fullWidth>
+            <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', bgcolor: theme.colors.card, color: theme.colors.text }}>
+              <Typography variant="h6" sx={{ flex: 1, textAlign: 'center', fontWeight: 700, color: theme.colors.text }}>
+                Reviews
+              </Typography>
+              <IconButton onClick={() => setReviewsOpen(false)} size="small" sx={{ color: theme.colors.secondaryText, position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)' }}>
+                <CloseIcon />
+              </IconButton>
+            </DialogTitle>
+            <DialogContent sx={{ bgcolor: theme.colors.card, color: theme.colors.text }}>
+              {/* Restaurant name and address */}
+              {branch && restaurant && (
+                <Box sx={{ mb: 3, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: theme.colors.primary, mb: 0.5 }}>
+                    {restaurant.name}
+                  </Typography>
+                  <Typography sx={{ color: theme.colors.secondaryText, fontSize: 15 }}>
+                    {branch.address}
+                  </Typography>
+                </Box>
+              )}
+              {/* Branch reviews */}
+              {reviewsLoading ? (
+                <Box sx={{ textAlign: 'center', my: 2 }}>
+                  <CircularProgress size={28} sx={{ color: theme.colors.primary }} />
+                </Box>
+              ) : reviewsError ? (
+                <Typography color="error" sx={{ mb: 2 }}>{reviewsError}</Typography>
+              ) : branchReviews.length === 0 ? (
+                <Typography sx={{ mb: 2, color: theme.colors.secondaryText }}>No reviews yet for this branch.</Typography>
+              ) : (
+                branchReviews.map((review, idx) => (
+                  <Box key={review._id || idx} sx={{ mb: 2, p: 2, bgcolor: theme.colors.background, borderRadius: 2, boxShadow: 1 }}>
+                    <Typography sx={{ fontWeight: 600, color: theme.colors.text }}>{review.userName || 'Anonymous'}</Typography>
+                    <Typography sx={{ color: theme.colors.text, mb: 1 }}>{'★'.repeat(review.rating || 4)}{'☆'.repeat(5 - (review.rating || 4))}</Typography>
+                    <Typography sx={{ color: theme.colors.text }}>{review.feedback || review.text || review.review || ''}</Typography>
+                  </Box>
+                ))
+              )}
+            </DialogContent>
+          </Dialog>
+          <Snackbar
+            open={reviewSnackbar.open}
+            autoHideDuration={3000}
+            onClose={() => setReviewSnackbar({ ...reviewSnackbar, open: false })}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+          >
+            <Alert
+              onClose={() => setReviewSnackbar({ ...reviewSnackbar, open: false })}
+              severity={reviewSnackbar.severity}
+              sx={{ width: '100%' }}
+            >
+              {reviewSnackbar.message}
+            </Alert>
+          </Snackbar>
         </Box>
       </Box>
     </>

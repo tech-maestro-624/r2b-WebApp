@@ -28,6 +28,14 @@ import { CartContext } from '../context/CartContext.jsx';
 import Snackbar from '@mui/material/Snackbar';
 import Alert from '@mui/material/Alert';
 import { useLocation, useNavigate } from 'react-router-dom';
+import Stepper from '@mui/material/Stepper';
+import Step from '@mui/material/Step';
+import StepLabel from '@mui/material/StepLabel';
+import CreditCardIcon from '@mui/icons-material/CreditCard';
+import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
+import GoogleIcon from '@mui/icons-material/Google';
+import PaymentIcon from '@mui/icons-material/Payment';
+import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 
 function getSavedAddresses() {
   return JSON.parse(localStorage.getItem('savedAddresses') || '[]');
@@ -96,12 +104,16 @@ const openRazorpayCheckout = async ({
           razorpaySignature: response.razorpay_signature,
         });
         // Call your backend to verify payment
-        await paymentService.verifyPayment({
+        const verification = await paymentService.verifyPayment({
           razorpayOrderId: response.razorpay_order_id,
           razorpayPaymentId: response.razorpay_payment_id,
           razorpaySignature: response.razorpay_signature,
         });
-        onSuccess && onSuccess(response);
+        if (verification && verification.success) {
+          onSuccess && onSuccess(response);
+        } else {
+          throw new Error('Payment not successful');
+        }
       } catch (err) {
         onFailure && onFailure(err);
       }
@@ -151,6 +163,7 @@ const CartStatusModal = ({ open, onClose, cartItems = [], handleQuantityChange, 
   });
   const [calculatingCart, setCalculatingCart] = useState(false);
   const [, forceUpdate] = useReducer(x => x + 1, 0);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
 
   useEffect(() => {
     if (open) {
@@ -316,28 +329,6 @@ console.log('token',token);
         landmark: selectedDeliveryAddress.landmark || ''
       };
 
-      // Calculate delivery distance (optional, for debugging)
-      let deliveryDistance = null;
-      if (
-        cartBranch &&
-        cartBranch.location &&
-        cartBranch.location.coordinates &&
-        selectedDeliveryAddress &&
-        selectedDeliveryAddress.coordinates
-      ) {
-        const [branchLng, branchLat] = cartBranch.location.coordinates;
-        const userLat = selectedDeliveryAddress.coordinates.latitude;
-        const userLng = selectedDeliveryAddress.coordinates.longitude;
-        if (
-          typeof branchLat === "number" &&
-          typeof branchLng === "number" &&
-          typeof userLat === "number" &&
-          typeof userLng === "number"
-        ) {
-          deliveryDistance = getDistanceFromLatLonInKm(userLat, userLng, branchLat, branchLng);
-        }
-      }
-
       // Fetch the latest cart from cartService
       const latestCart = await cartService.getCart();
       if (!latestCart || !latestCart.items || latestCart.items.length === 0) {
@@ -361,10 +352,9 @@ console.log('token',token);
         branch: branchId,
         orderType: 'Delivery',
         paymentMethod: 'Online',
-        couponCode: '',
+        couponId: appliedCoupon?.code || '',
         deliveryTip: 0,
-        deliveryAddress,
-        deliveryDistance
+        deliveryAddress
       };
 
       console.log('Placing order with payload:', orderData);
@@ -386,42 +376,14 @@ console.log('token',token);
       const paymentDetails = await paymentService.initiatePayment(orderId);
       console.log('paymentDetails:', paymentDetails);
 
-      console.log('About to open Razorpay checkout', {
-        razorpayOrderId: paymentDetails.razorpayOrderId,
-        amount: paymentDetails.amount,
-        user: {
-          email: orderResponse.order.customer?.email,
-          phone: orderResponse.order.customer?.phone,
-          name: orderResponse.order.customer?.name,
-        }
-      });
-      await openRazorpayCheckout({
-        razorpayOrderId: paymentDetails.razorpayOrderId,
-        amount: paymentDetails.amount, // in paise
-        user: {
-          email: orderResponse.order.customer?.email,
-          phone: orderResponse.order.customer?.phone,
-          name: orderResponse.order.customer?.name,
-        },
-        onSuccess: async (response) => {
-          console.log('Razorpay payment success', response);
-          setOrderSuccessOpen(true);
-          await cartService.clearCart();
-          setIsSummaryOpen(false);
-          setIsPaying(false);
-        },
-        onFailure: (err) => {
-          console.log('Razorpay payment failed', err);
-          setPaymentError(err.message || 'Payment failed or cancelled.');
-          setIsPaying(false);
-          forceUpdate();
-        },
-      });
-      console.log('Razorpay checkout flow completed');
+      setStep(2);
+      // Return details for payment
+      return { orderId, paymentDetails, orderResponse };
     } catch (error) {
       console.error('Order placement error:', error, error.response?.data);
       setIsPaying(false);
       setPaymentError(error.message || 'Failed to place your order. Please try again.');
+      throw error;
     }
   };
 
@@ -473,6 +435,58 @@ console.log('token',token);
     !['Delivery Tax'].includes(item.label)
   );
 
+  const handleProceedToPayment = async () => {
+    if (!selectedPaymentMethod) return;
+    setIsPaying(true);
+    setPaymentError('');
+    try {
+      // Call handlePlaceOrder to do all pre-payment logic and get payment details
+      const { orderId, paymentDetails, orderResponse } = await handlePlaceOrder();
+      // Now open Razorpay checkout
+      await openRazorpayCheckout({
+        razorpayOrderId: paymentDetails.razorpayOrderId,
+        amount: paymentDetails.amount, // in paise
+        user: {
+          email: orderResponse.order.customer?.email,
+          phone: orderResponse.order.customer?.phone,
+          name: orderResponse.order.customer?.name,
+        },
+        onSuccess: async (response) => {
+          try {
+            // Verify payment with backend
+            const verification = await paymentService.verifyPayment({
+              razorpayOrderId: response.razorpay_order_id,
+              razorpayPaymentId: response.razorpay_payment_id,
+              razorpaySignature: response.razorpay_signature,
+            });
+            if (verification && verification.success) {
+              setOrderSuccessOpen(true);
+              await cartService.clearCart();
+              setIsSummaryOpen(false);
+              setIsPaying(false);
+              onClose && onClose();
+            } else {
+              throw new Error('Payment not successful');
+            }
+          } catch (err) {
+            setPaymentError('Payment verification failed. Please try again or contact support.');
+            setIsPaying(false);
+          }
+        },
+        onFailure: async (err) => {
+          // Do NOT clear the cart here
+          setPaymentError(err.message || 'Payment failed or cancelled.');
+          setIsPaying(false);
+          // Debug: log the cart contents when payment is aborted
+          const cart = await cartService.getCart();
+          console.log('Cart contents after payment abort:', cart);
+        },
+      });
+    } catch (error) {
+      // Error handling is already done in handlePlaceOrder
+    }
+  };
+
   return (
     <>
       <Modal open={open} onClose={onClose}>
@@ -483,7 +497,7 @@ console.log('token',token);
             left: '50%',
             transform: 'translate(-50%, -50%)',
             width: '95%',
-            maxWidth: 500,
+            maxWidth: 600,
             bgcolor: theme.colors.background,
             borderRadius: 6,
             boxShadow: 24,
@@ -504,15 +518,42 @@ console.log('token',token);
           >
             <CloseIcon />
           </IconButton>
-          <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3, pt: 3 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Box sx={{ fontWeight: 700, color: step === 0 ? theme.colors.primary : theme.colors.secondaryText }}>Cart Status</Box>
-              <Box sx={{ width: 32, height: 2, bgcolor: theme.colors.border, mx: 1 }} />
-              <Box sx={{ fontWeight: 700, color: step === 1 ? theme.colors.primary : theme.colors.secondaryText }}>Cart Summary</Box>
-            </Box>
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', mb: 3, pt: 3, gap: 2 }}>
+            <Typography
+              sx={{
+                fontWeight: 700,
+                color: step === 0 ? theme.colors.primary : theme.colors.text,
+                fontSize: 18,
+                transition: 'color 0.2s',
+              }}
+            >
+              Cart Status
+            </Typography>
+            <Typography sx={{ color: theme.colors.text, fontWeight: 700, fontSize: 18 }}>-</Typography>
+            <Typography
+              sx={{
+                fontWeight: 700,
+                color: step === 1 ? theme.colors.primary : theme.colors.text,
+                fontSize: 18,
+                transition: 'color 0.2s',
+              }}
+            >
+              Cart Summary
+            </Typography>
+            <Typography sx={{ color: theme.colors.text, fontWeight: 700, fontSize: 18 }}>-</Typography>
+            <Typography
+              sx={{
+                fontWeight: 700,
+                color: step === 2 ? theme.colors.primary : theme.colors.text,
+                fontSize: 18,
+                transition: 'color 0.2s',
+              }}
+            >
+              Payment Section
+            </Typography>
           </Box>
           <Box sx={{ flex: 1, overflowY: 'auto', px: 4, pb: 4, pt: 0, minHeight: 120 }}>
-            {step === 0 ? (
+            {step === 0 && (
               <>
                 <Typography variant="h5" sx={{ mb: 1, textAlign: 'center', fontWeight: 700 }}>{cartBranch?.name}</Typography>
                 <Typography variant="body2" sx={{ mb: 3, textAlign: 'center', color: theme.colors.secondaryText }}>{cartBranch?.address}</Typography>
@@ -780,7 +821,8 @@ console.log('token',token);
                   </>
                 )}
               </>
-            ) : (
+            )}
+            {step === 1 && (
               <>
                 <Box sx={{ mb: 2 }}>
                   {cartItems.map(item => (
@@ -859,10 +901,129 @@ console.log('token',token);
                       borderRadius: 2,
                       '&:hover': { borderColor: theme.colors.primary, bgcolor: theme.colors.card }
                     }}
-                    onClick={handlePlaceOrder}
+                    onClick={() => setStep(2)}
                     disabled={!selectedDeliveryAddress}
                   >
-                    Place Order Now
+                    Place Order
+                  </Button>
+                </Box>
+              </>
+            )}
+            {step === 2 && (
+              <>
+                {/* Payment Methods UI */}
+                <Box sx={{ minHeight: 320, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', gap: 2, mt: 2 }}>
+                  {/* Payment Methods List */}
+                  {[
+                    {
+                      key: 'razorpay',
+                      label: 'Online Payment',
+                      subtitle: 'Pay securely with Razorpay',
+                      icon: <Box sx={{ bgcolor: '#FF5A33', color: '#fff', width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><CreditCardIcon sx={{ fontSize: 24 }} /></Box>
+                    },
+                    {
+                      key: 'phonepe',
+                      label: 'PhonePe',
+                      subtitle: 'Pay securely with PhonePe',
+                      icon: <Box sx={{ bgcolor: '#6f42c1', color: '#fff', width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><AccountBalanceWalletIcon sx={{ fontSize: 24 }} /></Box>
+                    },
+                    {
+                      key: 'gpay',
+                      label: 'Google Pay',
+                      subtitle: 'Pay securely with Google Pay',
+                      icon: <Box sx={{ bgcolor: '#4285F4', color: '#fff', width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><GoogleIcon sx={{ fontSize: 24 }} /></Box>
+                    },
+                    {
+                      key: 'paytm',
+                      label: 'Paytm',
+                      subtitle: 'Pay securely with Paytm',
+                      icon: <Box sx={{ bgcolor: '#00baf2', color: '#fff', width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><AccountBalanceWalletIcon sx={{ fontSize: 24 }} /></Box>
+                    },
+                    {
+                      key: 'upi',
+                      label: 'UPI Payment',
+                      subtitle: 'Pay using any UPI app',
+                      icon: <Box sx={{ bgcolor: '#43a047', color: '#fff', width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><PaymentIcon sx={{ fontSize: 24 }} /></Box>
+                    },
+                    {
+                      key: 'netbanking',
+                      label: 'Net Banking',
+                      subtitle: 'Pay using your bank account',
+                      icon: <Box sx={{ bgcolor: '#ff9800', color: '#fff', width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><AccountBalanceIcon sx={{ fontSize: 24 }} /></Box>
+                    }
+                  ].map((method, idx) => (
+                    <Box
+                      key={method.key}
+                      onClick={() => setSelectedPaymentMethod(method.key)}
+                      sx={{
+                        width: '100%',
+                        maxWidth: 420,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 2,
+                        p: 2,
+                        borderRadius: 3,
+                        border: selectedPaymentMethod === method.key ? `2px solid ${theme.colors.primary}` : `1.5px solid ${theme.colors.border}`,
+                        bgcolor: selectedPaymentMethod === method.key ? `${theme.colors.primary}10` : theme.colors.card,
+                        boxShadow: selectedPaymentMethod === method.key ? 3 : 1,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        mb: 0.5
+                      }}
+                    >
+                      {method.icon}
+                      <Box sx={{ flex: 1 }}>
+                        <Typography sx={{ fontWeight: 700, color: theme.colors.text, fontSize: 16 }}>{method.label}</Typography>
+                        <Typography sx={{ color: theme.colors.secondaryText, fontSize: 13 }}>{method.subtitle}</Typography>
+                      </Box>
+                      <Radio
+                        checked={selectedPaymentMethod === method.key}
+                        onChange={() => setSelectedPaymentMethod(method.key)}
+                        value={method.key}
+                        name="payment-method-radio"
+                        color="primary"
+                        sx={{ ml: 1 }}
+                      />
+                    </Box>
+                  ))}
+                  <Box sx={{ display: 'flex', justifyContent: 'flex-start', width: '100%', maxWidth: 420, mt: 2, mb: 1 }}>
+                    <Button
+                      variant="outlined"
+                      color="primary"
+                      sx={{
+                        textTransform: 'none',
+                        fontWeight: 700,
+                        minWidth: 120,
+                        borderColor: theme.colors.primary,
+                        color: theme.colors.primary,
+                        bgcolor: theme.colors.background,
+                        borderRadius: 2,
+                        '&:hover': { borderColor: theme.colors.primary, bgcolor: theme.colors.card }
+                      }}
+                      onClick={() => setStep(1)}
+                    >
+                      Back
+                    </Button>
+                  </Box>
+                  <Button
+                    variant="contained"
+                    sx={{
+                      minWidth: 180,
+                      fontSize: 16,
+                      fontWeight: 700,
+                      bgcolor: theme.colors.primary,
+                      color: theme.colors.buttonText,
+                      borderRadius: 2,
+                      boxShadow: 2,
+                      py: 1,
+                      '&:hover': {
+                        bgcolor: theme.colors.primaryDark || theme.colors.primary
+                      }
+                    }}
+                    disabled={!selectedPaymentMethod || isPaying}
+                    onClick={handleProceedToPayment}
+                  >
+                    {isPaying ? 'Processing...' : 'PROCEED TO PAYMENT'}
                   </Button>
                 </Box>
               </>

@@ -132,7 +132,7 @@ export const ticketService = {
       priority: ticketData.priority || 'Medium'
     };
     try {
-      const ticket = await apiService.post('/ticket/', payload);
+      const ticket = await apiService.post('/ticket', payload);
       return ticket;
     } catch (error) {
       console.error('Failed to create ticket:', error.message || error);
