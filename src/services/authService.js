@@ -252,4 +252,12 @@ export const authService = {
       throw error;
     }
   },
+
+  setToken: (token) => {
+    // If using axios:
+    if (apiService && apiService.defaults) {
+      apiService.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    }
+    // Or if you have a custom fetch wrapper, set the token there
+  },
 };

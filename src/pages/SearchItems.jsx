@@ -123,6 +123,7 @@ const SearchItems = () => {
             } else {
               enriched.price = typeof res.item.price === 'number' ? res.item.price : foundDishes[idx].price;
             }
+            if (!enriched.price || Number(enriched.price) === 0) enriched.price = 199;
             return enriched;
           }
         } catch (e) {}
@@ -386,10 +387,12 @@ const SearchItems = () => {
                 const quantity = cartItem ? cartItem.quantity : 0;
                 const restaurantId = dish.restaurantId || dish.restaurant?._id;
                 const branchId = dish.branchId || dish.branch?._id;
+                // Set displayPrice: if price is zero, missing, or falsy, use 199
                 let displayPrice = dish.price;
                 if (dish.hasVariants && Array.isArray(dish.variants) && dish.variants.length > 0) {
                   displayPrice = dish.variants[0].price;
                 }
+                if (!displayPrice || Number(displayPrice) === 0) displayPrice = 199;
 
                 // Find the branch details for this dish
                 const branchDetails = restaurants.find(r => r._id === branchId);
@@ -514,7 +517,7 @@ const SearchItems = () => {
               }) : (
                 <Typography sx={{ color: theme.colors.secondaryText, fontSize: 18, mt: 4 }}>
                   No dishes found for "{keyword}".
-                </Typography>
+                      </Typography>
               )}
             </Box>
           ) : (

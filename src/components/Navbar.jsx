@@ -47,6 +47,7 @@ import useMediaQuery from '@mui/material/useMediaQuery';
 import { useDeliveryAddress } from '../context/DeliveryAddressContext';
 import logo from '../assets/logo.png';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import { handleBack } from '../utils/navigation';
 
 // Helper to extract short address
 const getShortAddress = (address) => {
@@ -247,7 +248,7 @@ const Navbar = ({
         <Toolbar sx={{ maxWidth: 1440, minWidth: 0, width: '100%', mx: 'auto', px: `${theme.spacing.xl || 32}px`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: 64, height: 64 }}>
           {/* Left: Back Button (if not on HomePage), then Menu Icon */}
           {showBackButton ? (
-            <IconButton onClick={() => navigate(-1)} sx={{ color: theme.colors.primary, mr: 1, width: 80, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'flex-start' }}>
+            <IconButton onClick={() => handleBack(navigate)} sx={{ color: theme.colors.primary, mr: 1, width: 80, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'flex-start' }}>
               <ArrowBackIosNewIcon />
               <span style={{ marginLeft: 4, fontWeight: 600, fontSize: 16, fontFamily: 'Trebuchet MS, Arial, sans-serif', color: theme.colors.primary }}>Back</span>
             </IconButton>

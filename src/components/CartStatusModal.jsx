@@ -36,6 +36,8 @@ import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import GoogleIcon from '@mui/icons-material/Google';
 import PaymentIcon from '@mui/icons-material/Payment';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
+import { useCoupon } from '../context/CouponContext';
+import CircularProgress from '@mui/material/CircularProgress';
 
 function getSavedAddresses() {
   return JSON.parse(localStorage.getItem('savedAddresses') || '[]');
@@ -109,7 +111,7 @@ const openRazorpayCheckout = async ({
           razorpayPaymentId: response.razorpay_payment_id,
           razorpaySignature: response.razorpay_signature,
         });
-        if (verification && verification.success) {
+        if (verification) {
           onSuccess && onSuccess(response);
         } else {
           throw new Error('Payment not successful');
@@ -145,7 +147,6 @@ const CartStatusModal = ({ open, onClose, cartItems = [], handleQuantityChange, 
   const [orderSuccessOpen, setOrderSuccessOpen] = useState(false);
   const [couponCode, setCouponCode] = useState('');
   const [couponFeedback, setCouponFeedback] = useState('');
-  const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [step, setStep] = useState(0); // 0 = Cart Status, 1 = Cart Summary
   const [cartConflictOpen, setCartConflictOpen] = useState(false);
   const location = useLocation();
@@ -164,6 +165,8 @@ const CartStatusModal = ({ open, onClose, cartItems = [], handleQuantityChange, 
   const [calculatingCart, setCalculatingCart] = useState(false);
   const [, forceUpdate] = useReducer(x => x + 1, 0);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
+  const { appliedCoupon, applyCoupon, removeCoupon } = useCoupon();
+  const [applyCouponLoading, setApplyCouponLoading] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -198,7 +201,6 @@ const CartStatusModal = ({ open, onClose, cartItems = [], handleQuantityChange, 
   useEffect(() => {
     const calculateCartTotals = async () => {
       if (!cartItems.length || !selectedDeliveryAddress || !selectedDeliveryAddress.coordinates) {
-        console.log('failure');
         setCartCalculation({
           subtotal: 0, tax: 0, deliveryFee: 0, discount: 0, total: 0, isFreeShipping: false, taxBreakdown: [], deliveryBreakdown: []
         });
@@ -459,7 +461,8 @@ console.log('token',token);
               razorpayPaymentId: response.razorpay_payment_id,
               razorpaySignature: response.razorpay_signature,
             });
-            if (verification && verification.success) {
+            console.log('Payment verification response:', verification);
+            if (verification) {
               setOrderSuccessOpen(true);
               await cartService.clearCart();
               setIsSummaryOpen(false);
@@ -618,21 +621,26 @@ console.log('token',token);
                             setCouponFeedback('Please enter a coupon code.');
                             return;
                           }
+                          setApplyCouponLoading(true);
+                          setCouponFeedback('');
                           try {
                             // Placeholder: replace with your coupon validation logic
+                            await new Promise(res => setTimeout(res, 800)); // Simulate API
                             if (couponCode.trim().toLowerCase() === 'save10') {
-                              setAppliedCoupon({ code: 'SAVE10', discountAmount: 10, description: 'Flat ₹10 off' });
+                              applyCoupon({ code: 'SAVE10', discountAmount: 10, description: 'Flat ₹10 off' });
                               setCouponFeedback('Coupon applied!');
                             } else {
                               setCouponFeedback('Invalid coupon code.');
                             }
                           } catch (err) {
                             setCouponFeedback('Invalid or expired coupon.');
+                          } finally {
+                            setApplyCouponLoading(false);
                           }
                         }}
-                        disabled={!!appliedCoupon}
+                        disabled={!!appliedCoupon || applyCouponLoading}
                       >
-                        Apply
+                        {applyCouponLoading ? <CircularProgress size={18} sx={{ color: theme.colors.primary }} /> : 'Apply'}
                       </Button>
                     </Box>
                     {couponFeedback && (
@@ -986,7 +994,7 @@ console.log('token',token);
                       />
                     </Box>
                   ))}
-                  <Box sx={{ display: 'flex', justifyContent: 'flex-start', width: '100%', maxWidth: 420, mt: 2, mb: 1 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, width: '100%', maxWidth: 420, mt: 2, mb: 1 }}>
                     <Button
                       variant="outlined"
                       color="primary"
@@ -996,35 +1004,33 @@ console.log('token',token);
                         minWidth: 120,
                         borderColor: theme.colors.primary,
                         color: theme.colors.primary,
-                        bgcolor: theme.colors.background,
+                        bgcolor: 'transparent',
                         borderRadius: 2,
                         '&:hover': { borderColor: theme.colors.primary, bgcolor: theme.colors.card }
                       }}
-                      onClick={() => setStep(1)}
+                      onClick={() => setStep(0)}
                     >
                       Back
                     </Button>
+                    <Button
+                      variant="outlined"
+                      color="primary"
+                      sx={{
+                        textTransform: 'none',
+                        fontWeight: 700,
+                        minWidth: 180,
+                        borderColor: theme.colors.primary,
+                        color: theme.colors.primary,
+                        bgcolor: 'transparent',
+                        borderRadius: 2,
+                        '&:hover': { borderColor: theme.colors.primary, bgcolor: theme.colors.card }
+                      }}
+                      disabled={!selectedPaymentMethod || isPaying}
+                      onClick={handleProceedToPayment}
+                    >
+                      {isPaying ? 'Processing...' : 'PROCEED TO PAYMENT'}
+                    </Button>
                   </Box>
-                  <Button
-                    variant="contained"
-                    sx={{
-                      minWidth: 180,
-                      fontSize: 16,
-                      fontWeight: 700,
-                      bgcolor: theme.colors.primary,
-                      color: theme.colors.buttonText,
-                      borderRadius: 2,
-                      boxShadow: 2,
-                      py: 1,
-                      '&:hover': {
-                        bgcolor: theme.colors.primaryDark || theme.colors.primary
-                      }
-                    }}
-                    disabled={!selectedPaymentMethod || isPaying}
-                    onClick={handleProceedToPayment}
-                  >
-                    {isPaying ? 'Processing...' : 'PROCEED TO PAYMENT'}
-                  </Button>
                 </Box>
               </>
             )}

@@ -36,6 +36,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import { useDeliveryAddress } from '../context/DeliveryAddressContext';
 import { Helmet } from 'react-helmet';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import { handleBack } from '../utils/navigation';
 
 
 const HomePage = () => {
@@ -52,10 +53,12 @@ const HomePage = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [showAddressModal, setShowAddressModal] = useState(false);
+  const [addressLoading, setAddressLoading] = useState(false);
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
-    severity: 'success', // 'success' | 'error' | 'warning' | 'info'
+    severity: 'success',
+    key: 0,
   });
   const [selectedAddress, setSelectedAddress] = useState(null);
   const featuredRowRef = useRef(null);
@@ -194,7 +197,7 @@ const HomePage = () => {
   const handleSidebarClose = () => setSidebarOpen(false);
 
   const showSnackbar = (message, severity = 'success') => {
-    setSnackbar({ open: true, message, severity });
+    setSnackbar({ open: true, message, severity, key: new Date().getTime() });
   };
 
   const handleSnackbarClose = (event, reason) => {
@@ -205,16 +208,36 @@ const HomePage = () => {
   useEffect(() => {
     if (showAddressModal) {
       (async () => {
+        setAddressLoading(true);
         const selected = await locationService.getSelectedAddress();
         setSelectedAddress(selected);
-      })();
-      // Listen for custom addressChanged event (same tab)
-      const handleAddressChanged = async () => {
+        // Listen for custom addressChanged event (same tab)
+        const handleAddressChanged = async () => {
+          setAddressLoading(true);
+          const addresses = await locationService.getSavedAddresses();
+          // Sort by createdAt descending if available, else reverse
+          let sorted = addresses || [];
+          if (sorted.length > 0 && sorted[0].createdAt) {
+            sorted = [...sorted].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+          } else {
+            sorted = [...sorted].reverse();
+          }
+          setSavedAddresses(sorted);
+          setAddressLoading(false);
+        };
+        window.addEventListener('addressChanged', handleAddressChanged);
+        // Initial fetch and sort
         const addresses = await locationService.getSavedAddresses();
-        setSavedAddresses(addresses || []);
-      };
-      window.addEventListener('addressChanged', handleAddressChanged);
-      return () => window.removeEventListener('addressChanged', handleAddressChanged);
+        let sorted = addresses || [];
+        if (sorted.length > 0 && sorted[0].createdAt) {
+          sorted = [...sorted].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        } else {
+          sorted = [...sorted].reverse();
+        }
+        setSavedAddresses(sorted);
+        setAddressLoading(false);
+        return () => window.removeEventListener('addressChanged', handleAddressChanged);
+      })();
     }
   }, [showAddressModal]);
 
@@ -556,7 +579,11 @@ const HomePage = () => {
           </DialogTitle>
           <DialogContent sx={{ bgcolor: theme.modal.background }}>
             <Typography variant="h6" sx={{ mb: 2, color: theme.modal.text, textAlign: 'center' }}>Saved Delivery Addresses</Typography>
-            {savedAddresses.length === 0 ? (
+            {addressLoading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 120 }}>
+                <CircularProgress size={32} sx={{ color: theme.colors.primary }} />
+              </Box>
+            ) : savedAddresses.length === 0 ? (
               <Typography sx={{ color: theme.colors.secondaryText, textAlign: 'center' }}>No saved addresses found.</Typography>
             ) : (
               <List>
@@ -692,7 +719,7 @@ const HomePage = () => {
                           <Typography sx={{ fontWeight: 600, fontSize: 18 }}>{item.dishName}</Typography>
                           <Typography sx={{ color: theme.colors.secondaryText, fontSize: 15 }}>{item.restaurantName || item.branchName}</Typography>
                         </Box>
-                        <Typography sx={{ fontWeight: 700, color: theme.colors.primary, fontSize: 18 }}>₹{item.price}</Typography>
+                        <Typography sx={{ fontWeight: 700, color: theme.colors.primary, fontSize: 18 }}>₹{!item.price || Number(item.price) === 0 ? 199 : item.price}</Typography>
                       </Box>
                     ))
                   )}
@@ -1148,6 +1175,7 @@ const HomePage = () => {
           </DialogContent>
         </Dialog>
         <Snackbar
+          key={snackbar.key}
           open={snackbar.open}
           autoHideDuration={3000}
           onClose={handleSnackbarClose}

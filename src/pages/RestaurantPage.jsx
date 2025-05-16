@@ -209,10 +209,10 @@ const RestaurantPage = () => {
         console.log('restaurantData:',restaurantData);
         // Set initial selected outlet to branch from state, but only once
         if (!initialOutletSet.current) {
-          if (branchId) {
-            setSelectedOutlet(branchId);
-          } else if (restaurantData?.nearestBranchId) {
-            setSelectedOutlet(restaurantData.nearestBranchId);
+        if (branchId) {
+          setSelectedOutlet(branchId);
+        } else if (restaurantData?.nearestBranchId) {
+          setSelectedOutlet(restaurantData.nearestBranchId);
           }
           initialOutletSet.current = true;
         }
@@ -475,10 +475,10 @@ console.log('branch',branch);
       return (b.price || 0) - (a.price || 0);
     } else {
       // Recommended: available and serviceable first
-      const aAvailable = a.isAvailable === true && isServiceable(a);
-      const bAvailable = b.isAvailable === true && isServiceable(b);
-      if (aAvailable === bAvailable) return 0;
-      return aAvailable ? -1 : 1;
+    const aAvailable = a.isAvailable === true && isServiceable(a);
+    const bAvailable = b.isAvailable === true && isServiceable(b);
+    if (aAvailable === bAvailable) return 0;
+    return aAvailable ? -1 : 1;
     }
   });
 
@@ -638,8 +638,8 @@ console.log('branch',branch);
                   {branch && branch.city && (
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
                       <Typography variant="body1" sx={{ mb: 0, color: '#000', fontWeight: 500, fontSize: { xs: '1.05rem', sm: '1.12rem', md: '1.15rem', lg: '1.18rem' } }}>
-                        {branch.city}
-                      </Typography>
+                      {branch.city}
+                    </Typography>
                       {/* Dummy Ratings */}
                       <Box sx={{ display: 'flex', alignItems: 'center', bgcolor: theme.colors.card, borderRadius: 2, px: 1.5, py: 0.5, border: `1px solid ${theme.colors.primary}` }}>
                         <Typography sx={{ fontWeight: 700, color: '#000', fontSize: 16, mr: 0.5 }}>
@@ -668,7 +668,7 @@ console.log('branch',branch);
 
                   {/* Sort By Dropdown */}
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 3, width: '100%' }}>
-                    {Array.isArray(restaurant?.branches) && restaurant.branches.length > 1 && (
+                  {Array.isArray(restaurant?.branches) && restaurant.branches.length > 1 && (
                       <FormControl
                         size="small"
                         variant="outlined"
@@ -1148,7 +1148,7 @@ console.log('branch',branch);
                     top: '50%',
                     left: '50%',
                     transform: 'translate(-50%, -50%)',
-                    width: 350,
+                    width: { xs: 420, sm: 520 },
                     bgcolor: theme.modal.background,
                     color: theme.modal.text,
                     borderRadius: theme.modal.borderRadius,

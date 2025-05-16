@@ -1,5 +1,6 @@
 import React, { createContext, useState, useEffect, useRef } from 'react';
 import { authService } from '../services/authService';
+import { apiService } from '../services/apiServices';
 
 export const AuthContext = createContext();
 
@@ -10,6 +11,7 @@ export const AuthProvider = ({ children }) => {
   const [error, setError] = useState(null);
   const lastAuthCheckRef = useRef(0);
   const authCheckTimeoutRef = useRef(null);
+  const [authLoading, setAuthLoading] = useState(true);
 
   // Debounced auth check function
   const debouncedAuthCheck = async () => {
@@ -50,14 +52,26 @@ export const AuthProvider = ({ children }) => {
 
   // Check authentication status on app load
   useEffect(() => {
-    debouncedAuthCheck();
-
-    // Cleanup timeout on unmount
-    return () => {
-      if (authCheckTimeoutRef.current) {
-        clearTimeout(authCheckTimeoutRef.current);
-      }
-    };
+    const token = localStorage.getItem('authToken');
+    if (token) {
+      // Set token in API service (e.g., axios.defaults.headers.common['Authorization'] = `Bearer ${token}`)
+      authService.setToken(token);
+      apiService.get('/auth/me')
+        .then(userData => {
+          setUser(userData);
+          setIsAuthenticated(true);
+        })
+        .catch(() => {
+          setIsAuthenticated(false);
+          setUser(null);
+          localStorage.removeItem('authToken');
+        })
+        .finally(() => setAuthLoading(false));
+    } else {
+      setIsAuthenticated(false);
+      setUser(null);
+      setAuthLoading(false);
+    }
   }, []);
 
   // Login with phone number
@@ -147,7 +161,8 @@ export const AuthProvider = ({ children }) => {
         logout,
         skipLogin,
         debouncedAuthCheck,
-        updateUser
+        updateUser,
+        authLoading
       }}
     >
       {children}
