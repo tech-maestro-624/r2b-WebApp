@@ -61,3 +61,50 @@ npm run dev
 ```
 
 Visit `http://localhost:5173` to see the application running.
+
+## Setup and Installation
+
+1. Clone the repository
+2. Install dependencies:
+   ```
+   npm install
+   ```
+3. Start the development server:
+   ```
+   npm run dev
+   ```
+
+## Development Guidelines
+
+### Code Quality
+
+To identify unused variables and other linting issues, run:
+```
+npm run lint
+```
+
+To specifically find unused variables and imports in the codebase:
+```
+npm run find-unused
+```
+
+This will scan your code and generate a report of all unused variables, organized by file.
+
+This will check your code against the ESLint rules configured in `.eslintrc.json`.
+
+### Removing Unused Code
+
+To keep the codebase clean and efficient:
+
+1. Regularly run the linter to identify unused imports and variables
+2. Remove unused state variables from components
+3. Update import statements when components are deleted
+4. Make sure error states are properly handled or removed if unnecessary
+
+## Project Structure
+
+- `/src/components` - Reusable UI components
+- `/src/pages` - Page components
+- `/src/context` - React context providers
+- `/src/services` - API services
+- `/src/utils` - Utility functions

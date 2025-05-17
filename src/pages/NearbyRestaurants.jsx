@@ -7,7 +7,6 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
-import Skeleton from '@mui/material/Skeleton';
 import { Link } from 'react-router-dom';
 import Container from '@mui/material/Container';
 import Tabs from '@mui/material/Tabs';
@@ -20,7 +19,6 @@ const NearbyRestaurants = () => {
   const [loading, setLoading] = useState(true);
   const [coordinates, setCoordinates] = useState(null);
   const [tabValue, setTabValue] = useState(0);
-  const [sortOption, setSortOption] = useState('distance');
 
   useEffect(() => {
     const fetchCoordinates = async () => {
@@ -148,9 +146,6 @@ const NearbyRestaurants = () => {
             value={tabValue}
             onChange={(_, newValue) => {
               setTabValue(newValue);
-              if (newValue === 0) setSortOption('distance');
-              else if (newValue === 1) setSortOption('rating');
-              else if (newValue === 2) setSortOption('deliveryTime');
             }}
             textColor="primary"
             indicatorColor="primary"

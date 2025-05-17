@@ -32,7 +32,7 @@ const SearchItems = () => {
   const [restaurants, setRestaurants] = useState([]);
   const [loading, setLoading] = useState(false);
   // Cart logic
-  const { cartItems, addToCart, removeFromCart, changeCartItemQuantity, cartRestaurantId, branchId: cartBranchId, openCartModal, clearCart } = useContext(CartContext);
+  const { cartItems, addToCart, changeCartItemQuantity, cartRestaurantId, branchId: cartBranchId, clearCart } = useContext(CartContext);
   const [cartConflictOpen, setCartConflictOpen] = useState(false);
   const [pendingCartItem, setPendingCartItem] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });

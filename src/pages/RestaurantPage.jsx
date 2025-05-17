@@ -34,7 +34,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import OutlinedInput from '@mui/material/OutlinedInput';
 import { Helmet } from 'react-helmet';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import {  useDeliveryAddress } from '../context/LocationContext.jsx';
+import { useDeliveryAddress } from '../context/LocationContext.jsx';
 import { orderService } from '../services/orderService';
 
 function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
@@ -55,8 +55,8 @@ const RestaurantPage = () => {
   const location = useLocation();
   const restaurantId = location.state?.restaurantId;
   const branchId = location.state?.branchId;
-  const { openCartModal, closeCartModal, isCartOpen, cartItems, addToCart, removeFromCart, restaurantId: cartRestaurantId, branchId: cartBranchId, changeCartItemQuantity, clearCart, snackbar, handleCloseSnackbar } = useContext(CartContext);
-  const { isAuthenticated, openLoginModal  } = useAuth();
+  const { cartItems, addToCart, removeFromCart, restaurantId: cartRestaurantId, branchId: cartBranchId, changeCartItemQuantity, clearCart, snackbar, handleCloseSnackbar } = useContext(CartContext);
+  const { isAuthenticated, openLoginModal } = useAuth();
   const [restaurant, setRestaurant] = useState(null);
   const [branch, setBranch] = useState(null);
   const [menuRes, setMenuRes] = useState({}); // raw menu object
@@ -64,16 +64,13 @@ const RestaurantPage = () => {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [itemQuantities, setItemQuantities] = useState({});
   const [branchRestaurantImage, setBranchRestaurantImage] = useState(null);
   const [showAlert, setShowAlert] = useState(false);
   const [cartWarning, setCartWarning] = useState('');
-  const [recentlyAddedItem, setRecentlyAddedItem] = useState(null);
   const [cartEmptySnackbarOpen, setCartEmptySnackbarOpen] = useState(false);
   const [cartConflictOpen, setCartConflictOpen] = useState(false);
   const [pendingCartItem, setPendingCartItem] = useState(null);
-  const [cartLocked, setCartLocked] = useState(false);
-  const [cartBranch, setCartBranch] = useState(null);
+  const [recentlyAddedItem, setRecentlyAddedItem] = useState(null);
   const [selectedVariant, setSelectedVariant] = useState(null);
   const [showVariantModal, setShowVariantModal] = useState(false);
   const [variantItem, setVariantItem] = useState(null);
@@ -82,14 +79,11 @@ const RestaurantPage = () => {
   const [branchDetails, setBranchDetails] = useState([]);
   const { selectedDeliveryAddress } = useDeliveryAddress();
   const [isCartConflictLoading, setIsCartConflictLoading] = useState(false);
-  const [selectedAddOns, setSelectedAddOns] = useState([]); // For add-ons
-  const [selectedOptions, setSelectedOptions] = useState([]); // For options
+  const [selectedAddOns, setSelectedAddOns] = useState([]); 
+  const [selectedOptions, setSelectedOptions] = useState([]);
   const [sortBy, setSortBy] = useState('');
   const [menuFilter, setMenuFilter] = useState('all');
   const [reviewsOpen, setReviewsOpen] = useState(false);
-  const [reviewInput, setReviewInput] = useState('');
-  const [reviewLoading, setReviewLoading] = useState(false);
-  const [reviewSnackbar, setReviewSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [branchReviews, setBranchReviews] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [reviewsError, setReviewsError] = useState('');
@@ -1458,20 +1452,6 @@ console.log('branch',branch);
               )}
             </DialogContent>
           </Dialog>
-          <Snackbar
-            open={reviewSnackbar.open}
-            autoHideDuration={3000}
-            onClose={() => setReviewSnackbar({ ...reviewSnackbar, open: false })}
-            anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-          >
-            <Alert
-              onClose={() => setReviewSnackbar({ ...reviewSnackbar, open: false })}
-              severity={reviewSnackbar.severity}
-              sx={{ width: '100%' }}
-            >
-              {reviewSnackbar.message}
-            </Alert>
-          </Snackbar>
         </Box>
       </Box>
     </>
