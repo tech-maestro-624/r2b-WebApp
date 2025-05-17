@@ -10,7 +10,7 @@ import MenuItem from '@mui/material/MenuItem';
 import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
 import Select from '@mui/material/Select';
-import { useAuthModal } from '../context/AuthModalContext';
+import { useAuth } from '../context/AuthContext';
 import Fab from '@mui/material/Fab';
 import AddIcon from '@mui/icons-material/Add';
 import Dialog from '@mui/material/Dialog';
@@ -32,7 +32,7 @@ import { useNavigate } from 'react-router-dom';
 
 const TicketManager = () => {
   const { theme } = useContext(ThemeContext);
-  const { isAuthenticated } = useAuthModal();
+  const { isAuthenticated  } = useAuth();
   const navigate = useNavigate();
   const [openNewModal, setOpenNewModal] = useState(false);
   const [category, setCategory] = useState('');

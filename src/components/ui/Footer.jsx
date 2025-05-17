@@ -17,8 +17,8 @@ import LinkedInIcon from '@mui/icons-material/LinkedIn';
 import YouTubeIcon from '@mui/icons-material/YouTube';
 import GoogleIcon from '@mui/icons-material/Google';
 import AppleIcon from '@mui/icons-material/Apple';
-import { ThemeContext } from '../context/ThemeContext';
-import logo from '../assets/logo.png';
+import { ThemeContext } from '../../context/ThemeContext';
+import logo from '../../assets/logo.png';
 
 const Footer = () => {
   const { theme } = React.useContext(ThemeContext);

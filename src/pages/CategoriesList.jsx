@@ -5,7 +5,7 @@ import { restaurantService } from '../services/restaurantService';
 import { locationService } from '../services/locationService';
 import { fileService } from '../services/fileService';
 import { ThemeContext } from '../context/ThemeContext.jsx';
-import { useDeliveryAddress } from '../context/DeliveryAddressContext';
+import { useDeliveryAddress } from '../context/LocationContext.jsx';
 
 const CategoriesList = () => {
   const { categoryName: categoryNameParam } = useParams();

@@ -27,7 +27,7 @@ import Snackbar from '@mui/material/Snackbar';
 import Alert from '@mui/material/Alert';
 import { cartService } from '../services/cartService';
 import { DialogActions } from '@mui/material';
-import { useAuthModal } from '../context/AuthModalContext';
+import { useAuth } from '../context/AuthContext';
 import StarIcon from '@mui/icons-material/Star';
 import TextField from '@mui/material/TextField';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -58,7 +58,7 @@ const OrdersPage = () => {
   const [pendingCartItem, setPendingCartItem] = useState(null);
   const [pendingRestaurantId, setPendingRestaurantId] = useState(null);
   const [pendingBranchId, setPendingBranchId] = useState(null);
-  const { isAuthenticated, openLoginModal } = useAuthModal();
+  const { isAuthenticated, openLoginModal  } = useAuth();
   const [rateModalOpen, setRateModalOpen] = useState(false);
   const [orderToRate, setOrderToRate] = useState(null);
   const [rating, setRating] = useState(0);

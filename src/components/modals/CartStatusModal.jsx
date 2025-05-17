@@ -1,4 +1,4 @@
-import React, { useContext, useState, useEffect, useReducer } from 'react';
+import React, { useContext, useState, useEffect, useReducer, useCallback } from 'react';
 import Modal from '@mui/material/Modal';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
@@ -16,15 +16,14 @@ import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import { ThemeContext } from '../context/ThemeContext.jsx';
-import { cartService } from '../services/cartService.js';
-import { authService } from '../services/authService.js';
-import { apiService } from '../services/apiServices.js';
-import {orderService} from '../services/orderService.js'
-import { useAuthModal } from '../context/AuthModalContext';
-import { paymentService } from '../services/paymentService';
-import { loadRazorpayScript } from '../utils/razorpay';
-import { CartContext } from '../context/CartContext.jsx';
+import { ThemeContext } from '../../context/ThemeContext.jsx';
+import { cartService } from '../../services/cartService.js';
+import { apiService } from '../../services/apiServices.js';
+import {orderService} from '../../services/orderService.js'
+import { useAuth } from '../../context/AuthContext';
+import { paymentService } from '../../services/paymentService';
+import { loadRazorpayScript } from '../../utils/razorpay';
+import { CartContext } from '../../context/CartContext.jsx';
 import Snackbar from '@mui/material/Snackbar';
 import Alert from '@mui/material/Alert';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -36,8 +35,9 @@ import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import GoogleIcon from '@mui/icons-material/Google';
 import PaymentIcon from '@mui/icons-material/Payment';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
-import { useCoupon } from '../context/CouponContext';
+import { useCoupon } from '../../context/CartContext.jsx';
 import CircularProgress from '@mui/material/CircularProgress';
+import FloatingCart from '../ui/FloatingCart.jsx';
 
 function getSavedAddresses() {
   return JSON.parse(localStorage.getItem('savedAddresses') || '[]');
@@ -112,7 +112,7 @@ const openRazorpayCheckout = async ({
           razorpaySignature: response.razorpay_signature,
         });
         if (verification) {
-          onSuccess && onSuccess(response);
+        onSuccess && onSuccess(response);
         } else {
           throw new Error('Payment not successful');
         }
@@ -132,16 +132,25 @@ const openRazorpayCheckout = async ({
   rzp.open();
 };
 
-const CartStatusModal = ({ open, onClose, cartItems = [], handleQuantityChange, removeFromCart }) => {
+const CartStatusModal = () => {
   const { theme } = useContext(ThemeContext);
-  const { branchId, handleCloseSnackbar, clearCart } = useContext(CartContext);
-  const { isAuthenticated } = useAuthModal();
+  const { 
+    isCartOpen, 
+    closeCartModal, 
+    cartItems, 
+    branchId, 
+    handleCloseSnackbar, 
+    clearCart,
+    changeCartItemQuantity,
+    removeFromCart
+  } = useContext(CartContext);
+  
+  const { isAuthenticated, openLoginModal } = useAuth();
   const [cartBranch, setCartBranch] = useState(null);
   const [selectedDeliveryAddress, setSelectedDeliveryAddress] = useState(getSelectedAddress());
   const [savedAddresses, setSavedAddresses] = useState(getSavedAddresses());
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [isSummaryOpen, setIsSummaryOpen] = useState(false);
-  const { openLoginModal } = useAuthModal();
   const [isPaying, setIsPaying] = useState(false);
   const [paymentError, setPaymentError] = useState('');
   const [orderSuccessOpen, setOrderSuccessOpen] = useState(false);
@@ -168,12 +177,16 @@ const CartStatusModal = ({ open, onClose, cartItems = [], handleQuantityChange, 
   const { appliedCoupon, applyCoupon, removeCoupon } = useCoupon();
   const [applyCouponLoading, setApplyCouponLoading] = useState(false);
 
+  const handleQuantityChange = useCallback((itemId, delta) => {
+    changeCartItemQuantity(itemId, delta);
+  }, [changeCartItemQuantity]);
+
   useEffect(() => {
-    if (open) {
+    if (isCartOpen) {
       setSavedAddresses(getSavedAddresses());
       setSelectedDeliveryAddress(getSelectedAddress());
     }
-  }, [open]);
+  }, [isCartOpen]);
 
   useEffect(() => {
     console.log('Cart updated:', cartItems);
@@ -183,7 +196,7 @@ const CartStatusModal = ({ open, onClose, cartItems = [], handleQuantityChange, 
   useEffect(() => {
     const fetchCartBranch = async () => {
       if (cartItems.length > 0 && branchId) {
-        const { restaurantService } = await import('../services/restaurantService');
+        const { restaurantService } = await import('../../services/restaurantService');
         const branchRes = await restaurantService.getBranchById(branchId);
         setCartBranch(branchRes || null);
       } else {
@@ -194,8 +207,8 @@ const CartStatusModal = ({ open, onClose, cartItems = [], handleQuantityChange, 
   }, [cartItems, branchId]);
 
   useEffect(() => {
-    if (!open) setStep(0);
-  }, [open]);
+    if (!isCartOpen) setStep(0);
+  }, [isCartOpen]);
 
   // Advanced cart calculation effect
   useEffect(() => {
@@ -255,7 +268,7 @@ const CartStatusModal = ({ open, onClose, cartItems = [], handleQuantityChange, 
       }
     };
     calculateCartTotals();
-  }, [cartItems, selectedDeliveryAddress, appliedCoupon, open]);
+  }, [cartItems, selectedDeliveryAddress, appliedCoupon, isCartOpen]);
 
   const handleAddressSelect = (address) => {
     setSelectedDeliveryAddress(address);
@@ -407,7 +420,7 @@ console.log('token',token);
     const latestCart = await cartService.getCart();
     console.log('Latest cart after removal:', latestCart);
     if (!latestCart || !latestCart.items || latestCart.items.length === 0) {
-      onClose();
+      closeCartModal();
     }
   };
 
@@ -467,7 +480,7 @@ console.log('token',token);
               await cartService.clearCart();
               setIsSummaryOpen(false);
               setIsPaying(false);
-              onClose && onClose();
+              closeCartModal();
             } else {
               throw new Error('Payment not successful');
             }
@@ -492,7 +505,8 @@ console.log('token',token);
 
   return (
     <>
-      <Modal open={open} onClose={onClose}>
+      <FloatingCart />
+      <Modal open={isCartOpen} onClose={closeCartModal}>
         <Box
           sx={{
             position: 'absolute',
@@ -516,7 +530,7 @@ console.log('token',token);
         >
           <IconButton
             aria-label="close cart"
-            onClick={onClose}
+            onClick={closeCartModal}
             sx={{ position: 'absolute', top: 16, right: 16, zIndex: 2 }}
           >
             <CloseIcon />
@@ -725,7 +739,7 @@ console.log('token',token);
                                     branchId: cartBranch._id || cartBranch.branchId
                                   }
                                 });
-                                onClose && onClose();
+                                closeCartModal();
                               }}
                             >
                               Go to Restaurant
@@ -959,7 +973,7 @@ console.log('token',token);
                       subtitle: 'Pay using your bank account',
                       icon: <Box sx={{ bgcolor: '#ff9800', color: '#fff', width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><AccountBalanceIcon sx={{ fontSize: 24 }} /></Box>
                     }
-                  ].map((method, idx) => (
+                  ].map((method,idx) => (
                     <Box
                       key={method.key}
                       onClick={() => setSelectedPaymentMethod(method.key)}
@@ -1037,7 +1051,7 @@ console.log('token',token);
           </Box>
         </Box>
       </Modal>
-      <Modal open={orderSuccessOpen} onClose={() => { setOrderSuccessOpen(false); onClose(); }}>
+      <Modal open={orderSuccessOpen} onClose={() => { setOrderSuccessOpen(false); closeCartModal(); }}>
         <Box
           sx={{
             position: 'absolute',
@@ -1078,7 +1092,7 @@ console.log('token',token);
               minWidth: 120,
               boxShadow: 'none',
             }}
-            onClick={() => { setOrderSuccessOpen(false); onClose(); }}
+            onClick={() => { setOrderSuccessOpen(false); closeCartModal(); }}
           >
             CLOSE
           </Button>

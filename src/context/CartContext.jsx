@@ -1,10 +1,35 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { cartService } from '../services/cartService';
-import { useAuthModal } from './AuthModalContext';
+import { useAuth } from './AuthContext';
 
+// Main Cart Context
 export const CartContext = createContext();
 
+// Legacy FloatingCartModalContext for backward compatibility
+export const FloatingCartModalContext = createContext({ openCartModal: () => {} });
+
+// Export custom hook for using the cart context
+export const useCart = () => useContext(CartContext);
+
+// Export custom hook for using coupon functionality (for backward compatibility)
+export const useCoupon = () => {
+  const context = useContext(CartContext);
+  return {
+    appliedCoupon: context.appliedCoupon,
+    setAppliedCoupon: context.setAppliedCoupon,
+    availableCoupons: context.availableCoupons,
+    setAvailableCoupons: context.setAvailableCoupons,
+    loading: context.couponLoading,
+    setLoading: context.setCouponLoading,
+    error: context.couponError,
+    setError: context.setCouponError,
+    applyCoupon: context.applyCoupon,
+    removeCoupon: context.removeCoupon
+  };
+};
+
 export const CartProvider = ({ children }) => {
+  // Original Cart State
   const [cartItems, setCartItems] = useState([]);
   const [cartTotal, setCartTotal] = useState(0);
   const [cartCount, setCartCount] = useState(0);
@@ -12,8 +37,14 @@ export const CartProvider = ({ children }) => {
   const [restaurantId, setRestaurantId] = useState(null);
   const [branchId, setBranchId] = useState(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
-  const { isAuthenticated, openLoginModal } = useAuthModal();
+  const { isAuthenticated, openLoginModal } = useAuth();
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'warning' });
+
+  // Coupon State (from CouponContext)
+  const [appliedCoupon, setAppliedCoupon] = useState(null); // { code, discountAmount, description }
+  const [availableCoupons, setAvailableCoupons] = useState([]); // List of coupons
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [couponError, setCouponError] = useState(null);
 
   // Load cart data from cartService and subscribe to updates
   useEffect(() => {
@@ -110,8 +141,11 @@ export const CartProvider = ({ children }) => {
       throw error;
     }
   };
+  
+  // Cart Modal functions (from FloatingCartModalContext)
   const openCartModal = () => setIsCartOpen(true);
   const closeCartModal = () => setIsCartOpen(false);
+  
   // Clear cart
   const clearCart = async (message = 'Your cart has been cleared.', severity = 'warning') => {
     try {
@@ -172,35 +206,60 @@ export const CartProvider = ({ children }) => {
     }
   };
 
+  // Coupon functions (from CouponContext)
+  const applyCoupon = (coupon) => {
+    setAppliedCoupon(coupon);
+  };
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+  };
+
   const handleCloseSnackbar = () => {
     setSnackbar(prev => ({ ...prev, open: false }));
   };
 
+  // Combined provider value with all cart, modal, and coupon functionality
+  const contextValue = {
+    // Original Cart Context values
+    cartItems,
+    cartTotal,
+    cartCount,
+    isLoading,
+    restaurantId,
+    branchId,
+    addToCart,
+    updateQuantity,
+    removeFromCart,
+    clearCart,
+    setCartItems,
+    setCartTotal,
+    setCartCount,
+    isCartOpen,
+    openCartModal,
+    closeCartModal,
+    changeCartItemQuantity,
+    snackbar,
+    handleCloseSnackbar,
+    
+    // Coupon Context values
+    appliedCoupon,
+    setAppliedCoupon,
+    availableCoupons,
+    setAvailableCoupons,
+    couponLoading,
+    setCouponLoading,
+    couponError,
+    setCouponError,
+    applyCoupon,
+    removeCoupon
+  };
+
   return (
-    <CartContext.Provider
-      value={{
-        cartItems,
-        cartTotal,
-        cartCount,
-        isLoading,
-        restaurantId,
-        branchId,
-        addToCart,
-        updateQuantity,
-        removeFromCart,
-        clearCart,
-        setCartItems,
-        setCartTotal,
-        setCartCount,
-        isCartOpen,
-        openCartModal,
-        closeCartModal,
-        changeCartItemQuantity,
-        snackbar,
-        handleCloseSnackbar
-      }}
-    >
-      {children}
+    <CartContext.Provider value={contextValue}>
+      <FloatingCartModalContext.Provider value={{ openCartModal }}>
+        {children}
+      </FloatingCartModalContext.Provider>
     </CartContext.Provider>
   );
 };

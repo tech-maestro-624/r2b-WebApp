@@ -25,7 +25,7 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import Radio from '@mui/material/Radio';
 import CloseIcon from '@mui/icons-material/Close';
-import { useAuthModal } from '../context/AuthModalContext';
+import { useAuth } from '../context/AuthContext';
 import Alert from '@mui/material/Alert';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
@@ -34,10 +34,8 @@ import CircularProgress from '@mui/material/CircularProgress';
 import OutlinedInput from '@mui/material/OutlinedInput';
 import { Helmet } from 'react-helmet';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import { useDeliveryAddress } from '../context/DeliveryAddressContext';
-import TextField from '@mui/material/TextField';
+import {  useDeliveryAddress } from '../context/LocationContext.jsx';
 import { orderService } from '../services/orderService';
-import axios from 'axios';
 
 function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
   const R = 6371; // Radius of the earth in km
@@ -58,7 +56,7 @@ const RestaurantPage = () => {
   const restaurantId = location.state?.restaurantId;
   const branchId = location.state?.branchId;
   const { openCartModal, closeCartModal, isCartOpen, cartItems, addToCart, removeFromCart, restaurantId: cartRestaurantId, branchId: cartBranchId, changeCartItemQuantity, clearCart, snackbar, handleCloseSnackbar } = useContext(CartContext);
-  const { isAuthenticated, openLoginModal } = useAuthModal();
+  const { isAuthenticated, openLoginModal  } = useAuth();
   const [restaurant, setRestaurant] = useState(null);
   const [branch, setBranch] = useState(null);
   const [menuRes, setMenuRes] = useState({}); // raw menu object

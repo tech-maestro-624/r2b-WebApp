@@ -1,8 +1,8 @@
 import React, { useState, useContext } from 'react';
 import Box from '@mui/material/Box';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
-import { CartContext } from '../context/CartContext.jsx';
-import { ThemeContext } from '../context/ThemeContext.jsx';
+import { CartContext } from '../../context/CartContext.jsx';
+import { ThemeContext } from '../../context/ThemeContext.jsx';
 
 const FloatingCart = () => {
   const { cartItems, isCartOpen, openCartModal, closeCartModal } = useContext(CartContext);

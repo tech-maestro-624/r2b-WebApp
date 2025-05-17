@@ -33,7 +33,7 @@ import TextField from '@mui/material/TextField';
 import SearchIcon from '@mui/icons-material/Search';
 import { searchFoodItems } from '../services/foodService';
 import CircularProgress from '@mui/material/CircularProgress';
-import { useDeliveryAddress } from '../context/DeliveryAddressContext';
+import { useDeliveryAddress } from '../context/LocationContext.jsx';
 import { Helmet } from 'react-helmet';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { handleBack } from '../utils/navigation';
@@ -211,10 +211,10 @@ const HomePage = () => {
         setAddressLoading(true);
         const selected = await locationService.getSelectedAddress();
         setSelectedAddress(selected);
-        // Listen for custom addressChanged event (same tab)
-        const handleAddressChanged = async () => {
+      // Listen for custom addressChanged event (same tab)
+      const handleAddressChanged = async () => {
           setAddressLoading(true);
-          const addresses = await locationService.getSavedAddresses();
+        const addresses = await locationService.getSavedAddresses();
           // Sort by createdAt descending if available, else reverse
           let sorted = addresses || [];
           if (sorted.length > 0 && sorted[0].createdAt) {
@@ -224,8 +224,8 @@ const HomePage = () => {
           }
           setSavedAddresses(sorted);
           setAddressLoading(false);
-        };
-        window.addEventListener('addressChanged', handleAddressChanged);
+      };
+      window.addEventListener('addressChanged', handleAddressChanged);
         // Initial fetch and sort
         const addresses = await locationService.getSavedAddresses();
         let sorted = addresses || [];
@@ -236,7 +236,7 @@ const HomePage = () => {
         }
         setSavedAddresses(sorted);
         setAddressLoading(false);
-        return () => window.removeEventListener('addressChanged', handleAddressChanged);
+      return () => window.removeEventListener('addressChanged', handleAddressChanged);
       })();
     }
   }, [showAddressModal]);

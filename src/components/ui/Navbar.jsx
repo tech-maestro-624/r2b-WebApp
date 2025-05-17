@@ -17,10 +17,10 @@ import InputAdornment from '@mui/material/InputAdornment';
 import Paper from '@mui/material/Paper';
 import Popper from '@mui/material/Popper';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ThemeContext } from '../context/ThemeContext.jsx';
-import { AuthContext } from '../context/AuthContext.jsx';
-import { useAuthModal } from '../context/AuthModalContext';
-import { useLocationModal } from '../context/LocationModalContext';
+import { ThemeContext } from '../../context/ThemeContext.jsx';
+import { AuthContext } from '../../context/AuthContext.jsx';
+import { useAuth } from '../../context/AuthContext';
+import { useDeliveryAddress } from '../../context/LocationContext.jsx';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
@@ -28,7 +28,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import CloseIcon from '@mui/icons-material/Close';
-import { locationService } from '../services/locationService';
+import { locationService } from '../../services/locationService';
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
 import ListItemButton from '@mui/material/ListItemButton';
@@ -44,10 +44,9 @@ import SunnyIcon from '@mui/icons-material/Sunny';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import { GoogleMap, LoadScript, Marker, useJsApiLoader } from '@react-google-maps/api';
 import useMediaQuery from '@mui/material/useMediaQuery';
-import { useDeliveryAddress } from '../context/DeliveryAddressContext';
-import logo from '../assets/logo.png';
+import logo from '../../assets/logo.png';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import { handleBack } from '../utils/navigation';
+import { handleBack } from '../../utils/navigation';
 
 // Helper to extract short address
 const getShortAddress = (address) => {
@@ -76,7 +75,7 @@ const Navbar = ({
 }) => {
   const { theme, isDarkMode, toggleTheme } = useContext(ThemeContext);
   const { isAuthenticated, user, logout } = useContext(AuthContext);
-  const { openLoginModal } = useAuthModal();
+  const { openLoginModal  } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const isTicketDetailsPage = location.pathname.startsWith('/ticket/');
