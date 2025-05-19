@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useContext } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Box } from '@mui/material';
 import Navbar from '../ui/Navbar.jsx';
@@ -7,6 +7,7 @@ import Footer from '../ui/Footer.jsx';
 import Loader from '../common/Loader';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useEventBus } from '../../providers/EventBusProvider';
+import { ThemeContext } from '../../context/ThemeContext';
 
 // Layout Component - Provides the basic page structure
 const Layout = ({ children, Component, componentKey }) => {
@@ -14,6 +15,7 @@ const Layout = ({ children, Component, componentKey }) => {
   const eventBus = useEventBus();
   const location = useLocation();
   const navigate = useNavigate();
+  const { theme } = useContext(ThemeContext);
   
   // UI state
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -77,7 +79,7 @@ const Layout = ({ children, Component, componentKey }) => {
       minHeight: '100vh', 
       display: 'flex', 
       flexDirection: 'column',
-      background: '#FFFFFF'
+      background: theme.colors.background
     }}>
       {/* Navbar */}
       <Navbar 
@@ -105,7 +107,7 @@ const Layout = ({ children, Component, componentKey }) => {
         flex: 1, 
         display: 'flex', 
         flexDirection: 'column',
-        background: '#FFFFFF',
+        background: theme.colors.background,
         minHeight: '400px'
       }}>
         {Component ? (

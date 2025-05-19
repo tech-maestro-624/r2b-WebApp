@@ -1,23 +1,42 @@
-import React from 'react';
-import { Box, CircularProgress } from '@mui/material';
+import React, { useContext } from 'react';
+import CircularProgress from '@mui/material/CircularProgress';
+import { ThemeContext } from '../../context/ThemeContext';
 
-// Global loader component
-const Loader = ({ fullPage }) => (
-  <Box sx={{ 
-    display: 'flex', 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    minHeight: fullPage ? '100vh' : '300px',
-    width: fullPage ? '100vw' : '100%',
-    position: fullPage ? 'fixed' : 'absolute',
-    top: 0,
-    left: 0,
-    bgcolor: fullPage ? '#FFFFFF' : 'rgba(255, 255, 255, 0.85)',
-    backdropFilter: fullPage ? 'none' : 'blur(3px)',
-    zIndex: fullPage ? 9999 : 10,
-  }}>
-    <CircularProgress sx={{ color: '#FF5A33' }} size={fullPage ? 50 : 40} thickness={fullPage ? 5 : 4} />
-  </Box>
-);
+const Loader = ({ fullPage = false, size = 64, thickness = 4 }) => {
+  const { theme } = useContext(ThemeContext);
+
+  if (fullPage) {
+    return (
+      <div
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 2000,
+          background: theme.colors.background,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          transition: 'background 0.3s',
+        }}
+      >
+        <CircularProgress
+          sx={{ color: theme.colors.primary }}
+          size={size}
+          thickness={thickness}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <CircularProgress
+        sx={{ color: theme.colors.primary }}
+        size={size}
+        thickness={thickness}
+      />
+    </div>
+  );
+};
 
 export default Loader; 

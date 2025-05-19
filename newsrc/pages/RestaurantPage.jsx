@@ -25,7 +25,7 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import Radio from '@mui/material/Radio';
 import CloseIcon from '@mui/icons-material/Close';
-import { useAuth } from '../context/AuthContext';
+import { useAuthModal } from '../context/AuthModalContext';
 import Alert from '@mui/material/Alert';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
@@ -34,8 +34,10 @@ import CircularProgress from '@mui/material/CircularProgress';
 import OutlinedInput from '@mui/material/OutlinedInput';
 import { Helmet } from 'react-helmet';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import { useDeliveryAddress } from '../context/LocationContext.jsx';
+import { useDeliveryAddress } from '../context/DeliveryAddressContext';
+import TextField from '@mui/material/TextField';
 import { orderService } from '../services/orderService';
+import axios from 'axios';
 
 function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
   const R = 6371; // Radius of the earth in km
@@ -55,8 +57,8 @@ const RestaurantPage = () => {
   const location = useLocation();
   const restaurantId = location.state?.restaurantId;
   const branchId = location.state?.branchId;
-  const { cartItems, addToCart, removeFromCart, restaurantId: cartRestaurantId, branchId: cartBranchId, changeCartItemQuantity, clearCart, snackbar, handleCloseSnackbar } = useContext(CartContext);
-  const { isAuthenticated, openLoginModal } = useAuth();
+  const { openCartModal, closeCartModal, isCartOpen, cartItems, addToCart, removeFromCart, restaurantId: cartRestaurantId, branchId: cartBranchId, changeCartItemQuantity, clearCart, snackbar, handleCloseSnackbar } = useContext(CartContext);
+  const { isAuthenticated, openLoginModal } = useAuthModal();
   const [restaurant, setRestaurant] = useState(null);
   const [branch, setBranch] = useState(null);
   const [menuRes, setMenuRes] = useState({}); // raw menu object
@@ -64,13 +66,16 @@ const RestaurantPage = () => {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [itemQuantities, setItemQuantities] = useState({});
   const [branchRestaurantImage, setBranchRestaurantImage] = useState(null);
   const [showAlert, setShowAlert] = useState(false);
   const [cartWarning, setCartWarning] = useState('');
+  const [recentlyAddedItem, setRecentlyAddedItem] = useState(null);
   const [cartEmptySnackbarOpen, setCartEmptySnackbarOpen] = useState(false);
   const [cartConflictOpen, setCartConflictOpen] = useState(false);
   const [pendingCartItem, setPendingCartItem] = useState(null);
-  const [recentlyAddedItem, setRecentlyAddedItem] = useState(null);
+  const [cartLocked, setCartLocked] = useState(false);
+  const [cartBranch, setCartBranch] = useState(null);
   const [selectedVariant, setSelectedVariant] = useState(null);
   const [showVariantModal, setShowVariantModal] = useState(false);
   const [variantItem, setVariantItem] = useState(null);
@@ -79,11 +84,14 @@ const RestaurantPage = () => {
   const [branchDetails, setBranchDetails] = useState([]);
   const { selectedDeliveryAddress } = useDeliveryAddress();
   const [isCartConflictLoading, setIsCartConflictLoading] = useState(false);
-  const [selectedAddOns, setSelectedAddOns] = useState([]); 
-  const [selectedOptions, setSelectedOptions] = useState([]);
+  const [selectedAddOns, setSelectedAddOns] = useState([]); // For add-ons
+  const [selectedOptions, setSelectedOptions] = useState([]); // For options
   const [sortBy, setSortBy] = useState('');
   const [menuFilter, setMenuFilter] = useState('all');
   const [reviewsOpen, setReviewsOpen] = useState(false);
+  const [reviewInput, setReviewInput] = useState('');
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewSnackbar, setReviewSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [branchReviews, setBranchReviews] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [reviewsError, setReviewsError] = useState('');
@@ -600,6 +608,9 @@ console.log('branch',branch);
       <h2 id="menu-section" style={{position:'absolute',left:'-9999px',height:'1px',width:'1px',overflow:'hidden'}}>Menu</h2>
       <Box
         sx={{
+          minHeight: '100vh',
+          width: '100vw',
+          bgcolor: theme.colors.background,
           color: theme.colors.text,
           transition: 'background 0.3s, color 0.3s',
           fontFamily: 'Trebuchet MS, Arial, sans-serif',
@@ -1033,7 +1044,7 @@ console.log('branch',branch);
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
-                                  background: theme.colors.card,
+                                  background: '#fff',
                                   boxSizing: 'border-box',
                                   ml: 1
                                 }}
@@ -1449,6 +1460,20 @@ console.log('branch',branch);
               )}
             </DialogContent>
           </Dialog>
+          <Snackbar
+            open={reviewSnackbar.open}
+            autoHideDuration={3000}
+            onClose={() => setReviewSnackbar({ ...reviewSnackbar, open: false })}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+          >
+            <Alert
+              onClose={() => setReviewSnackbar({ ...reviewSnackbar, open: false })}
+              severity={reviewSnackbar.severity}
+              sx={{ width: '100%' }}
+            >
+              {reviewSnackbar.message}
+            </Alert>
+          </Snackbar>
         </Box>
       </Box>
     </>

@@ -32,7 +32,7 @@ const SearchItems = () => {
   const [restaurants, setRestaurants] = useState([]);
   const [loading, setLoading] = useState(false);
   // Cart logic
-  const { cartItems, addToCart, changeCartItemQuantity, cartRestaurantId, branchId: cartBranchId, clearCart } = useContext(CartContext);
+  const { cartItems, addToCart, removeFromCart, changeCartItemQuantity, cartRestaurantId, branchId: cartBranchId, openCartModal, clearCart } = useContext(CartContext);
   const [cartConflictOpen, setCartConflictOpen] = useState(false);
   const [pendingCartItem, setPendingCartItem] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
@@ -104,11 +104,9 @@ const SearchItems = () => {
       console.log('Restaurants:', branchResults);
       // Fetch full food item details for each dish
       const foodItemIds = foundDishes.map(d => d._id || d.id).filter(Boolean);
-      console.log('Food item IDs:', foodItemIds);
       const enrichedDishes = await Promise.all(foodItemIds.map(async (id, idx) => {
         try {
           const res = await restaurantService.getFoodItemById(id);
-          console.log('Food item details:', res);
           if (res && res.item) {
             let enriched = {
               ...foundDishes[idx],
@@ -338,7 +336,7 @@ const SearchItems = () => {
           Discover the best places to order {keyword} online in your city. See top-rated restaurants, prices, and delivery options for {keyword} on Roll2Bowl.
         </p>
       )}
-      <div style={{ color: theme.colors.text, fontFamily: 'Trebuchet MS, Arial, sans-serif' }}>
+      <div style={{ minHeight: '100vh', background: theme.colors.background, color: theme.colors.text, fontFamily: 'Trebuchet MS, Arial, sans-serif' }}>
         <Box sx={{ width: '100%', py: 6, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', maxWidth: 1600, mx: 'auto', px: 4 }}>
           <Typography variant="h4" sx={{ fontWeight: 700, color: theme.colors.text, mb: 3 }}>
             {keyword ? `Search results for "${keyword.replace(/-/g, ' ')}"` : 'Search Results'}
@@ -462,7 +460,7 @@ const SearchItems = () => {
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            background: theme.colors.card,
+                            background: '#fff',
                             boxSizing: 'border-box',
                             ml: 1
                           }}

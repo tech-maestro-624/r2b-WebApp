@@ -16,14 +16,27 @@ export const fileService = {
   downloadFile: async (id) => {
     try {
       if (!id) return null;
+
       const response = await apiService.get(`/download/${id}`);
+
       if (response?.success && response.data) {
+        // First decode the URL
         let imageUrl = decodeURIComponent(response.data);
+
+        // Replace %2F with / if it still exists after decoding
         imageUrl = imageUrl.replace(/%2F/g, '/');
-        // BYPASS CACHE: just return the direct URL
-        console.log('imageUrl from downloadFile', imageUrl);
-        return imageUrl;
+
+        // Ensure the URL is properly formatted
+        if (typeof imageUrl === 'string') {
+          // Log the processed URL for debugging
+          const cachedImage = await getCachedImage(imageUrl);
+          return cachedImage;
+        }
+
+        console.warn('Warning: downloadFile returned invalid URL:', imageUrl);
+        return null;
       }
+
       return null;
     } catch (error) {
       console.error('Download file error:', error);
@@ -48,12 +61,26 @@ export const fileService = {
       if (!restaurant) return null;
       const resolvedRestaurant = { ...restaurant };
 
+      // Handle main restaurant image
+      if (restaurant.image) {
+        resolvedRestaurant.image = await fileService.downloadFile(restaurant.image);
+      }
+      
+      // Handle logo
       if (restaurant.logo) {
         resolvedRestaurant.logoUrl = await fileService.downloadFile(restaurant.logo);
       }
+      
+      // Handle cover image
       if (restaurant.coverImage) {
         resolvedRestaurant.coverImageUrl = await fileService.downloadFile(restaurant.coverImage);
       }
+
+      // Handle branch images if they exist
+      if (restaurant.nearestBranch && restaurant.nearestBranch.image) {
+        resolvedRestaurant.nearestBranch.image = await fileService.downloadFile(restaurant.nearestBranch.image);
+      }
+
       return resolvedRestaurant;
     } catch (error) {
       console.error('[FileService] Resolve restaurant images error:', error);

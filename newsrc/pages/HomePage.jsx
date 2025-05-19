@@ -33,7 +33,7 @@ import TextField from '@mui/material/TextField';
 import SearchIcon from '@mui/icons-material/Search';
 import { searchFoodItems } from '../services/foodService';
 import CircularProgress from '@mui/material/CircularProgress';
-import { useDeliveryAddress } from '../context/LocationContext.jsx';
+import { useDeliveryAddress } from '../context/DeliveryAddressContext';
 import { Helmet } from 'react-helmet';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { handleBack } from '../utils/navigation';
@@ -113,20 +113,20 @@ const HomePage = () => {
       setLoading(true);
       try {
         let res = await restaurantService.getAllCategories();
+        console.log('Raw categories response:', res.categories);
         let categories = res.categories || [];
+        // Resolve images for all categories
         categories = await Promise.all(categories.map(async cat => {
-          let imageUrl = null;
-          if (cat.image) {
-            imageUrl = cat.image.startsWith('http') ? cat.image : await fileService.downloadFile(cat.image);
-          }
+          const resolvedCategory = await fileService.resolveCategoryImage(cat);
           return {
             ...cat,
-            imageUrl,
+            imageUrl: resolvedCategory.imageUrl || 'https://placehold.co/120x120/e0e0e0/666666?text=Category'
           };
         }));
-        console.log('categories images', categories.map(cat => cat.imageUrl));
+        console.log('Mapped categories with imageUrl:', categories);
         setCategories(categories);
       } catch (err) {
+        console.error('Error fetching categories:', err);
         setCategories([]);
       }
       setLoading(false);
@@ -159,19 +159,17 @@ const HomePage = () => {
           return distA - distB;
         });
         restaurants = await Promise.all(restaurants.map(async restaurant => {
-          let imageUrl = 'fallback-url';
-          if (restaurant.coverImage) {
-            imageUrl = await fileService.downloadFile(restaurant.coverImage);
-          } else if (restaurant.image) {
-            imageUrl = restaurant.image.startsWith('http') ? restaurant.image : await fileService.downloadFile(restaurant.image);
-          } else if (restaurant.coverImageUrl) {
-            imageUrl = restaurant.coverImageUrl;
-          } else if (restaurant.logoUrl) {
-            imageUrl = restaurant.logoUrl;
+          let imageUrl = 'https://images.unsplash.com/photo-1565299507177-b0ac66763828?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=60';
+          if (restaurant.image) {
+            const downloadedUrl = await fileService.downloadFile(restaurant.image);
+            if (downloadedUrl) {
+              imageUrl = downloadedUrl;
+            }
           }
           return {
             id: restaurant._id,
             name: `${restaurant.nearestBranch?.name}`,
+            image: imageUrl,
             rating: restaurant.rating || 4.0,
             reviewCount: restaurant.reviewCount || 0,
             distance: restaurant.nearestBranch?.distanceInKm ? `${restaurant.nearestBranch.distanceInKm} km` : 'Nearby',
@@ -181,13 +179,14 @@ const HomePage = () => {
             nearestBranch: restaurant.nearestBranch || null,
             address: restaurant.nearestBranch?.address || '',
             ...restaurant,
-            image: imageUrl,
           };
         }));
       }
       setNearbyRestaurants(restaurants);
+      console.log('Nearby restaurants from API:', restaurants);
     } catch (error) {
       setNearbyRestaurants([]);
+      console.error('Error fetching nearby restaurants:', error);
     }
     setLoadingNearbyRestaurants(false);
   };
@@ -215,10 +214,10 @@ const HomePage = () => {
         setAddressLoading(true);
         const selected = await locationService.getSelectedAddress();
         setSelectedAddress(selected);
-      // Listen for custom addressChanged event (same tab)
-      const handleAddressChanged = async () => {
+        // Listen for custom addressChanged event (same tab)
+        const handleAddressChanged = async () => {
           setAddressLoading(true);
-        const addresses = await locationService.getSavedAddresses();
+          const addresses = await locationService.getSavedAddresses();
           // Sort by createdAt descending if available, else reverse
           let sorted = addresses || [];
           if (sorted.length > 0 && sorted[0].createdAt) {
@@ -228,8 +227,8 @@ const HomePage = () => {
           }
           setSavedAddresses(sorted);
           setAddressLoading(false);
-      };
-      window.addEventListener('addressChanged', handleAddressChanged);
+        };
+        window.addEventListener('addressChanged', handleAddressChanged);
         // Initial fetch and sort
         const addresses = await locationService.getSavedAddresses();
         let sorted = addresses || [];
@@ -240,7 +239,7 @@ const HomePage = () => {
         }
         setSavedAddresses(sorted);
         setAddressLoading(false);
-      return () => window.removeEventListener('addressChanged', handleAddressChanged);
+        return () => window.removeEventListener('addressChanged', handleAddressChanged);
       })();
     }
   }, [showAddressModal]);
@@ -298,17 +297,13 @@ const HomePage = () => {
         console.log('Response in the mid:', response);
         if (response && response.restaurants) {
           const formattedRestaurants = await Promise.all(response.restaurants.map(async restaurant => {
-            let imageUrl = 'fallback-url';
-            if (restaurant.coverImage) {
-              imageUrl = await fileService.downloadFile(restaurant.coverImage);
-            } else if (restaurant.image) {
-              imageUrl = await fileService.downloadFile(restaurant.image);
-            } else if (restaurant.coverImageUrl) {
-              imageUrl = restaurant.coverImageUrl;
-            } else if (restaurant.logoUrl) {
-              imageUrl = restaurant.logoUrl;
+            let imageUrl = 'https://images.unsplash.com/photo-1565299507177-b0ac66763828?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=60';
+            if (restaurant.image) {
+              const downloadedUrl = await fileService.downloadFile(restaurant.image);
+              if (downloadedUrl) {
+                imageUrl = downloadedUrl;
+              }
             }
-            console.log('imageUrl', imageUrl);
             const restaurantId = restaurant._id || restaurant.id;
             const safeBranchId = restaurant.nearestBranch?._id || restaurant.nearestBranch?.id || `default-${restaurantId}`;
             const safeBranch = restaurant.nearestBranch || {
@@ -421,6 +416,7 @@ const HomePage = () => {
         },
         { root: null, rootMargin: '0px', threshold: 0.0 }
       );
+      console.log('Attaching observer to sentinel', node);
       observerRef.current.observe(node);
     }
   }, [loadingMoreNearby, loadingNearbyRestaurants, visibleNearbyCount, nearbyRestaurants.length]);
@@ -845,7 +841,6 @@ const HomePage = () => {
                             },
                           }}
                         >
-                          {console.log('cat.imageUrl', cat.imageUrl)}
                           {cat.imageUrl ? (
                             <img
                               src={cat.imageUrl}
@@ -986,17 +981,11 @@ const HomePage = () => {
                         transition: 'box-shadow 0.2s, transform 0.2s',
                         '&:hover': { boxShadow: '0 4px 16px rgba(0,0,0,0.13)', transform: 'translateY(-2px) scale(1.03)' }
                       }} onClick={() => navigate(`/restaurant/${rest.name.toLowerCase().replace(/\s+/g, '-')}/${rest.nearestBranch?.name?.toLowerCase().replace(/\s+/g, '-') || 'main-branch'}`, { state: { restaurantId: rest.id, branchId: rest.nearestBranchId } })}>
-                        <Box sx={{ width: '100%', height: 160, overflow: 'hidden', borderTopLeftRadius: 12, borderTopRightRadius: 12 }}>
-                          {console.log('rest.image before render', rest.image)}
-                          <img
-                            src={rest.image}
-                            alt={rest.name + ' cover'}
-                            style={{ width: '100%', height: '100%', objectFit: 'cover', borderTopLeftRadius: 12, borderTopRightRadius: 12 }}
-                            loading="lazy"
-                            onError={e => { e.target.src = 'https://images.unsplash.com/photo-1565299507177-b0ac66763828?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=60'; }}
-                          />
-                          {console.log('rest.image after render', rest.image)}
-                        </Box>
+                        {rest.image && (
+                          <Box sx={{ width: '100%', height: 160, overflow: 'hidden', borderTopLeftRadius: 12, borderTopRightRadius: 12 }}>
+                            <img src={rest.image} alt={rest.name + ' cover'} style={{ width: '100%', height: '100%', objectFit: 'cover', borderTopLeftRadius: 12, borderTopRightRadius: 12 }} loading="lazy" />
+                          </Box>
+                        )}
                         <Box sx={{ p: 2, pt: 1.5, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }}>
                           <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                             <Typography
@@ -1116,16 +1105,11 @@ const HomePage = () => {
                             transition: 'box-shadow 0.2s, transform 0.2s',
                             '&:hover': notServiceable ? {} : { boxShadow: '0 4px 16px rgba(0,0,0,0.13)', transform: 'translateY(-2px) scale(1.03)' }
                           }}>
-                            <Box sx={{ width: '100%', height: 160, overflow: 'hidden', borderTopLeftRadius: 12, borderTopRightRadius: 12 }}>
-                              {console.log('rest.image', rest.image)}
-                              <img
-                                src={rest.image}
-                                alt={rest.name + ' cover'}
-                                style={{ width: '100%', height: '100%', objectFit: 'cover', borderTopLeftRadius: 12, borderTopRightRadius: 12 }}
-                                loading="lazy"
-                                onError={e => { e.target.src = 'https://images.unsplash.com/photo-1565299507177-b0ac66763828?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=60'; }}
-                              />
-                            </Box>
+                            {rest.image && (
+                              <Box sx={{ width: '100%', height: 160, overflow: 'hidden', borderTopLeftRadius: 12, borderTopRightRadius: 12 }}>
+                                <img src={rest.image} alt={rest.name + ' cover'} style={{ width: '100%', height: '100%', objectFit: 'cover', borderTopLeftRadius: 12, borderTopRightRadius: 12 }} loading="lazy" />
+                              </Box>
+                            )}
                             <Box sx={{ p: 2, pt: 1.5, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }}>
                               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                                 <Typography

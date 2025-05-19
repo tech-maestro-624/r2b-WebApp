@@ -20,15 +20,13 @@ const generateHash = (url) => {
 };
 
 export const getCachedImage = async (imageUrl) => {
-  // If it's a relative URL (starts with /), prepend the base URL
-  console.log('imageUrl before processing:', imageUrl);
   if (imageUrl && imageUrl.startsWith('/')) {
     imageUrl = `${BASE_URL}${imageUrl}`;
   }
 
   if (!isValidImageUrl(imageUrl)) {
-    console.warn('Invalid image URL:', imageUrl);
-    return imageUrl;
+    console.warn('Invalid image URL for caching:', imageUrl);
+    return null;
   }
 
   try {
@@ -37,22 +35,29 @@ export const getCachedImage = async (imageUrl) => {
     const cache = await caches.open('image-cache');
     const cached = await cache.match(imageUrl);
     if (cached) {
-      return URL.createObjectURL(await cached.blob());
+      const contentType = cached.headers.get('content-type');
+      if (contentType && contentType.startsWith('image/')) {
+        return URL.createObjectURL(await cached.blob());
+      } else {
+        // Remove invalid cache entry
+        await cache.delete(imageUrl);
+      }
     }
 
-    // Add credentials to the fetch request
     const response = await fetch(imageUrl, {
-      credentials: 'include', // This ensures cookies are sent
-      mode: 'cors' // This enables CORS
+      credentials: 'include',
+      mode: 'cors'
     });
-    
     if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
-
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.startsWith('image/')) {
+      throw new Error('Fetched resource is not an image');
+    }
     await cache.put(imageUrl, response.clone());
     return URL.createObjectURL(await response.blob());
   } catch (err) {
-    console.warn('Image cache error:', err);
-    return imageUrl;
+    console.warn('Image cache error:', err, imageUrl);
+    return null;
   }
 };
 
