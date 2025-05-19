@@ -846,6 +846,7 @@ const HomePage = () => {
                           }}
                         >
                           {console.log('cat.imageUrl', cat.imageUrl)}
+                          {console.log('cat.image', cat.image)}
                           {cat.imageUrl ? (
                             <img
                               src={cat.imageUrl}
