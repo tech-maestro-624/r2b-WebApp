@@ -9,12 +9,14 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { searchFoodItems } from '../services/foodService';
 import { locationService } from '../services/locationService';
 import { restaurantService } from '../services/restaurantService';
+import { fileService } from '../services/fileService';
 import { CartContext } from '../context/CartContext.jsx';
 import Snackbar from '@mui/material/Snackbar';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
+import Modal from '@mui/material/Modal';
 import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
 import { Helmet } from 'react-helmet';
@@ -63,15 +65,27 @@ const SearchItems = () => {
       const items = await searchFoodItems(searchTerm, coords);
       // Separate dishes and restaurants
       let foundDishes = items.filter(item => item.type === 'dish' || item.dishName);
-      console.log('Found dishes from search API:', foundDishes);
+      console.log('foundDishes results', foundDishes);
+      // Process foundDishes to download all images directly
+      for (let dish of foundDishes) {
+        // Download food item image if available
+        console.log('dish.image', dish.image);
+        dish.imageUrl = await fileService.downloadFile(dish.image);
+        console.log('dish.imageUrl', dish.imageUrl);
+        // Download restaurant image if available
+        if (dish.restaurantImage && typeof dish.restaurantImage === 'string' && !dish.restaurantImage.startsWith('http')) {
+          dish.restaurantImageUrl = await fileService.downloadFile(dish.restaurantImage);
+          console.log(`Downloaded restaurant image for ${dish.restaurantName}:`, dish.restaurantImageUrl);
+        }
+      }
       // Extract unique branch IDs from foundDishes
+      console.log('foundDishes: ids', foundDishes);
       const branchIds = [...new Set(foundDishes.map(dish => dish.branchId).filter(Boolean))];
       console.log('Branch IDs:', branchIds);
       // For each branchId, call getBranchById and log the result
       const branchResults = [];
       for (const branchId of branchIds) {
         const branchRes = await restaurantService.getBranchById(branchId);
-        console.log('Branch API result for', branchId, branchRes);
         console.log('Branch details:', {
           id: branchRes?._id,
           name: branchRes?.branchName,
@@ -81,6 +95,14 @@ const SearchItems = () => {
           serviceableDistance: branchRes?.serviceableDistance
         });
         if (branchRes) {
+          // Download restaurant image if available
+          if (branchRes.restaurant && branchRes.restaurant.image) {
+            branchRes.restaurant.imageUrl = await fileService.downloadFile(branchRes.restaurant.image);
+          }
+          // Download branch image if available
+          if (branchRes.image) {
+            branchRes.imageUrl = await fileService.downloadFile(branchRes.image);
+          }
           branchResults.push(branchRes);
         }
       }
@@ -108,18 +130,33 @@ const SearchItems = () => {
       const enrichedDishes = await Promise.all(foodItemIds.map(async (id, idx) => {
         try {
           const res = await restaurantService.getFoodItemById(id);
-          console.log('Food item details:', res);
           if (res && res.item) {
             let enriched = {
               ...foundDishes[idx],
               ...res.item,
-              image: res.item.imageUrl || foundDishes[idx].image,
+              // Keep the already downloaded imageUrl if we have it
+              imageUrl: foundDishes[idx].imageUrl || res.item.imageUrl || null,
               name: res.item.name || foundDishes[idx].name,
               description: res.item.description || foundDishes[idx].description,
               category: res.item.category || foundDishes[idx].category,
               dishType: res.item.dishType || foundDishes[idx].dishType,
               variants: res.item.variants || foundDishes[idx].variants,
+              restaurantImageUrl: foundDishes[idx].restaurantImageUrl || null
             };
+            
+            
+            // If we still don't have an imageUrl, try to get it from the image ID
+            if (!enriched.imageUrl && (res.item.image || enriched.image)) {
+              const imageId = res.item.image || enriched.image;
+
+              if (Array.isArray(imageId) && imageId.length > 0) {
+                enriched.imageUrl = await fileService.downloadFile(imageId[0]);
+              } else if (typeof imageId === 'string' && !imageId.startsWith('http')) {
+                enriched.imageUrl = await fileService.downloadFile(imageId);
+               }
+            }
+            // console.log('enriched dishes after image download', enriched);
+
             if (res.item.hasVariants && Array.isArray(res.item.variants) && res.item.variants.length > 0) {
               enriched.price = res.item.variants[0].price;
             } else {
@@ -129,8 +166,10 @@ const SearchItems = () => {
             return enriched;
           }
         } catch (e) {}
+        // If we reach here, use the original dish that we've already processed for images
         return foundDishes[idx];
       }));
+      console.log('enrichedDishes dishes', enrichedDishes);
       setDishes(enrichedDishes);
       setLoading(false);
     };
@@ -440,13 +479,18 @@ const SearchItems = () => {
                   >
                     {/* Dish Image */}
                     <Box sx={{ width: 140, height: 150, borderRadius: 2, overflow: 'hidden', border: '1.5px solid #bdbdbd', m: 2, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: theme.colors.card }}>
-                      <img src={dish.image} alt={dish.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
+                      <img 
+                        src={dish.imageUrl || (dish.image && dish.image.startsWith('http') ? dish.image : null) || 'https://via.placeholder.com/140x150?text=No+Image'} 
+                        alt={dish.name} 
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} 
+                        loading="lazy" 
+                      />
                     </Box>
                     {/* Dish Details */}
                     <CardContent sx={{ p: 2, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                         <Typography
-                          sx={{ fontWeight: 700, fontSize: 20, color: (dish.isAvailable === false || notServiceable) ? theme.colors.text : theme.colors.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 200, lineHeight: 1 }}
+                          sx={{ fontWeight: 700, fontSize: 20, color: theme.colors.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 200, lineHeight: 1 }}
                           noWrap
                         >
                           {dish.name}
@@ -478,14 +522,14 @@ const SearchItems = () => {
                         </Box>
                       </Box>
                       {dish.restaurantName || dish.restaurant ? (
-                        <Typography sx={{ color: (dish.isAvailable === false || notServiceable) ? theme.colors.text : theme.colors.secondaryText, fontSize: 14, mb: 0.5 }}>
+                        <Typography sx={{ color: theme.colors.secondaryText, fontSize: 14, mb: 0.5 }}>
                           {dish.restaurantName || dish.restaurant}
                         </Typography>
                       ) : null}
-                      <Typography sx={{ color: (dish.isAvailable === false || notServiceable) ? theme.colors.text : theme.colors.secondaryText, fontSize: 15, mb: 1 }}>
+                      <Typography sx={{ color: theme.colors.secondaryText, fontSize: 15, mb: 1 }}>
                         {dish.description}
                       </Typography>
-                      <Typography sx={{ color: (dish.isAvailable === false || notServiceable) ? theme.colors.text : theme.colors.text, fontSize: 16, mb: 1, fontWeight: 500 }}>
+                      <Typography sx={{ color: theme.colors.text, fontSize: 16, mb: 1, fontWeight: 500 }}>
                         {dish.category && dish.category.name ? dish.category.name : ''}
                       </Typography>
                       <Typography sx={{ fontWeight: 700, color: theme.colors.primary, fontSize: 18, mb: 1 }}>
@@ -565,9 +609,30 @@ const SearchItems = () => {
                       }
                     }}
                   >
-                    {((rest.restaurant && rest.restaurant.image) || rest.image) && (
+                    {((rest.restaurant && (rest.restaurant.imageUrl || rest.restaurant.image)) || rest.imageUrl || rest.restaurantImageUrl || rest.image) ? (
                       <Box sx={{ width: '100%', height: 160, overflow: 'hidden', borderTopLeftRadius: 12, borderTopRightRadius: 12 }}>
-                        <img src={rest.restaurant?.image || rest.image} alt={(rest.name || rest.branchName) + ' cover'} style={{ width: '100%', height: '100%', objectFit: 'cover', borderTopLeftRadius: 12, borderTopRightRadius: 12 }} loading="lazy" />
+                        <img 
+                          src={
+                            rest.restaurant?.imageUrl || 
+                            (rest.restaurant?.image && rest.restaurant.image.startsWith('http') ? rest.restaurant.image : null) || 
+                            rest.imageUrl || 
+                            rest.restaurantImageUrl || 
+                            (rest.image && rest.image.startsWith('http') ? rest.image : null) || 
+                            'https://via.placeholder.com/320x160?text=No+Image'
+                          } 
+                          alt={(rest.name || rest.branchName) + ' cover'} 
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', borderTopLeftRadius: 12, borderTopRightRadius: 12 }} 
+                          loading="lazy" 
+                        />
+                      </Box>
+                    ) : (
+                      <Box sx={{ width: '100%', height: 160, overflow: 'hidden', borderTopLeftRadius: 12, borderTopRightRadius: 12 }}>
+                        <img 
+                          src="https://via.placeholder.com/320x160?text=No+Image" 
+                          alt={(rest.name || rest.branchName) + ' cover'} 
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', borderTopLeftRadius: 12, borderTopRightRadius: 12 }} 
+                          loading="lazy" 
+                        />
                       </Box>
                     )}
                     <Box sx={{ p: 2, pt: 1.5, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', gap: 0.5, alignItems: 'center', textAlign: 'center' }}>
@@ -596,17 +661,60 @@ const SearchItems = () => {
             </Box>
           )}
         </Box>
-        {/* Cart Conflict Dialog */}
-        <Dialog open={cartConflictOpen} onClose={() => setCartConflictOpen(false)}>
-          <DialogTitle>Cart Conflict</DialogTitle>
-          <DialogContent>
-            <Typography>You already have an item in your cart. Would you like to clear your cart and add this item instead?</Typography>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => handleCartConflict(true)} color="primary" variant="contained">Clear Cart & Add</Button>
-            <Button onClick={() => handleCartConflict(false)} color="secondary" variant="outlined">Cancel</Button>
-          </DialogActions>
-        </Dialog>
+        {/* Cart Conflict Modal */}
+        <Modal open={cartConflictOpen} onClose={() => setCartConflictOpen(false)}>
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: { xs: 420, sm: 520 },
+              bgcolor: theme.modal ? theme.modal.background : theme.colors.card,
+              color: theme.modal ? theme.modal.text : theme.colors.text,
+              borderRadius: theme.modal ? theme.modal.borderRadius : theme.borderRadius?.medium || 8,
+              boxShadow: theme.modal ? theme.modal.boxShadow : '0 8px 32px rgba(0,0,0,0.18)',
+              p: 4,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 2,
+            }}
+          >
+            <Typography id="cart-conflict-title" variant="h6" sx={{ mb: 2, textAlign: 'center', color: theme.modal ? theme.modal.text : theme.colors.text }}>
+              You have items in your cart from another restaurant.
+            </Typography>
+            <Typography id="cart-conflict-description" sx={{ mb: 3, textAlign: 'center', color: theme.modal ? theme.modal.text : theme.colors.text }}>
+              Would you like to clear your cart and add items from this restaurant?
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 2, width: '100%', justifyContent: 'center' }}>
+              <Button
+                variant="contained"
+                sx={{ 
+                  bgcolor: theme.modalButton ? theme.modalButton.primary : theme.colors.primary, 
+                  color: theme.modalButton ? theme.modalButton.primaryText : '#fff', 
+                  borderRadius: theme.modalButton?.borderRadius || theme.borderRadius?.small || 4, 
+                  fontWeight: 600 
+                }}
+                onClick={() => handleCartConflict(true)}
+              >
+                Clear Cart & Continue
+              </Button>
+              <Button
+                variant="outlined"
+                sx={{ 
+                  color: theme.modalButton ? theme.modalButton.secondaryText : theme.colors.primary, 
+                  borderColor: theme.modalButton ? theme.modalButton.border : theme.colors.primary, 
+                  borderRadius: theme.modalButton?.borderRadius || theme.borderRadius?.small || 4, 
+                  fontWeight: 600 
+                }}
+                onClick={() => handleCartConflict(false)}
+              >
+                Keep Current Cart
+              </Button>
+            </Box>
+          </Box>
+        </Modal>
         <Snackbar
           open={snackbar.open}
           autoHideDuration={3000}

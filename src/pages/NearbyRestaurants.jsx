@@ -73,10 +73,24 @@ const NearbyRestaurants = () => {
         }
 
         restaurants = await Promise.all(restaurants.map(async restaurant => {
-          let imageUrl = restaurant.coverImageUrl || restaurant.logoUrl || 'https://images.unsplash.com/photo-1565299507177-b0ac66763828?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=60';
-          if (!restaurant.coverImageUrl && restaurant.coverImage) {
+          let imageUrl = null;
+          
+          // Use image or coverImage if available
+          if (restaurant.image) {
+            imageUrl = await fileService.downloadFile(restaurant.image);
+          } else if (restaurant.coverImage) {
             imageUrl = await fileService.downloadFile(restaurant.coverImage);
+          } else if (restaurant.coverImageUrl) {
+            imageUrl = restaurant.coverImageUrl;
+          } else if (restaurant.logoUrl) {
+            imageUrl = restaurant.logoUrl;
+          } else {
+            imageUrl = 'https://images.unsplash.com/photo-1565299507177-b0ac66763828?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=60';
           }
+          
+          console.log('restaurant image id', restaurant.image || restaurant.coverImage);
+          console.log('imageUrl from download', imageUrl);
+          
           return {
             id: restaurant._id,
             name: restaurant.nearestBranch?.name || restaurant.name,
@@ -201,6 +215,7 @@ const NearbyRestaurants = () => {
                 }}>
                   {rest.image && (
                     <Box sx={{ width: '100%', height: 160, overflow: 'hidden', borderTopLeftRadius: 12, borderTopRightRadius: 12 }}>
+                      {console.log('rest.image in card', rest.image)}
                       <img src={rest.image} alt={rest.name + ' cover'} style={{ width: '100%', height: '100%', objectFit: 'cover', borderTopLeftRadius: 12, borderTopRightRadius: 12 }} />
                     </Box>
                   )}

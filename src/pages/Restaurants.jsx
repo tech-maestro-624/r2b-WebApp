@@ -88,17 +88,11 @@ const Restaurants = () => {
         const response = await restaurantService.getRestaurants(params);
         if (response && response.restaurants) {
           const formattedRestaurants = await Promise.all(response.restaurants.map(async restaurant => {
-            let imageUrl = 'https://images.unsplash.com/photo-1565299507177-b0ac66763828?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=60';
+            let imageUrl = null;
             if (restaurant.image) {
-              const downloadedUrl = await fileService.downloadFile(restaurant.image);
-              if (downloadedUrl) {
-                if (downloadedUrl.startsWith('http')) {
-                  imageUrl = downloadedUrl;
-                } else {
-                  imageUrl = downloadedUrl;
-                }
-              }
+              imageUrl = await fileService.downloadFile(restaurant.image);
             }
+            
             let cuisineTypes = [];
             if (restaurant.cuisineTypes && Array.isArray(restaurant.cuisineTypes)) {
               cuisineTypes = restaurant.cuisineTypes.filter(type => typeof type === 'string' && type.length > 0);
@@ -235,11 +229,13 @@ const Restaurants = () => {
                 }
               });
             }}>
-              {rest.image && (
-                <Box sx={{ width: '100%', height: 160, overflow: 'hidden', borderTopLeftRadius: 12, borderTopRightRadius: 12 }}>
-                  <img src={rest.image} alt={rest.name + ' cover'} style={{ width: '100%', height: '100%', objectFit: 'cover', borderTopLeftRadius: 12, borderTopRightRadius: 12 }} />
-                </Box>
-              )}
+              <Box sx={{ width: '100%', height: 160, overflow: 'hidden', borderTopLeftRadius: 12, borderTopRightRadius: 12 }}>
+                <img 
+                  src={rest.imageUrl || 'https://images.unsplash.com/photo-1565299507177-b0ac66763828?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=60'} 
+                  alt={rest.name + ' cover'} 
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', borderTopLeftRadius: 12, borderTopRightRadius: 12 }} 
+                />
+              </Box>
               <Box sx={{ p: 2, pt: 1.5, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                   <Typography sx={{ fontSize: 20, fontWeight: 700, flex: 1, color: theme.colors.text, fontFamily: 'Trebuchet MS, Arial, sans-serif', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{rest.name}</Typography>

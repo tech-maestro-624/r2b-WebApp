@@ -116,14 +116,15 @@ const SideMenu = ({
   showOrdersModal,
   setShowOrdersModal,
   handleOpenAddressModal,
-  openAddressModal
+  openAddressModal,
+  showLogoutModal,
+  setShowLogoutModal
 }) => {
   const { theme, isDarkMode, toggleTheme } = useContext(ThemeContext);  
   const [showSettingsModal, setShowSettingsModal] = React.useState(false);
   const [orderUpdatesEnabled, setOrderUpdatesEnabled] = React.useState(true);
   const [specialOffersEnabled, setSpecialOffersEnabled] = React.useState(true);
   const { logout } = useContext(AuthContext);
-  const [showLogoutModal, setShowLogoutModal] = React.useState(false);
   const [showCouponsModal, setShowCouponsModal] = React.useState(false);
   const [coupons, setCoupons] = React.useState([]);
   const [loadingCoupons, setLoadingCoupons] = React.useState(false);
@@ -357,7 +358,13 @@ const SideMenu = ({
         </Box>
       </Drawer>
       {/* Settings Modal */}
-      <Dialog open={showSettingsModal} onClose={() => setShowSettingsModal(false)} maxWidth="xs" fullWidth>
+      <Dialog open={showSettingsModal} onClose={() => setShowSettingsModal(false)} maxWidth="xs" fullWidth
+        PaperProps={{
+          sx: {
+            border: `2px solid ${theme.colors.primary}`,
+            borderRadius: theme.modal?.borderRadius || 8,
+          }
+        }}>
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', bgcolor: theme.colors.card, color: theme.colors.text }}>
           Settings
           <IconButton onClick={() => setShowSettingsModal(false)} size="large" sx={{ color: theme.colors.secondaryText }}>
@@ -409,10 +416,16 @@ const SideMenu = ({
         </DialogContent>
       </Dialog>
       {/* Logout Confirmation Modal */}
-      <Dialog open={showLogoutModal} onClose={() => setShowLogoutModal(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', bgcolor: theme.colors.card, color: theme.colors.text }}>
-          Logout
-          <IconButton onClick={() => setShowLogoutModal(false)} size="large" sx={{ color: theme.colors.secondaryText }}>
+      <Dialog open={showLogoutModal} onClose={() => setShowLogoutModal(false)} maxWidth="xs" fullWidth
+        PaperProps={{
+          sx: {
+            border: `2px solid ${theme.colors.primary}`,
+            borderRadius: theme.modal?.borderRadius || 8,
+          }
+        }}>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', bgcolor: theme.colors.card, color: theme.colors.text }}>
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>Logout</Typography>
+          <IconButton onClick={() => setShowLogoutModal(false)} size="large" sx={{ color: theme.colors.secondaryText, position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)' }}>
             <CloseIcon />
           </IconButton>
         </DialogTitle>
@@ -423,7 +436,17 @@ const SideMenu = ({
           <Button
             variant="contained"
             sx={{ bgcolor: theme.colors.primary, color: '#fff', fontWeight: 600, fontSize: 18, borderRadius: 2, px: 4, py: 1, boxShadow: 'none', '&:hover': { bgcolor: theme.colors.primary }, mr: 2 }}
-            onClick={async () => { setShowLogoutModal(false); await logout(); }}
+            onClick={async () => { 
+              try {
+                setShowLogoutModal(false); 
+                await logout();
+                // Force a page reload to ensure all state is reset
+                window.location.href = '/';
+              } catch (error) {
+                console.error('Logout error:', error);
+                setSnackbar({ open: true, message: 'Failed to logout. Please try again.', severity: 'error' });
+              }
+            }}
           >
             Logout
           </Button>
@@ -437,7 +460,13 @@ const SideMenu = ({
         </DialogActions>
       </Dialog>
       {/* Coupons Modal */}
-      <Dialog open={showCouponsModal} onClose={() => setShowCouponsModal(false)} maxWidth="xs" fullWidth>
+      <Dialog open={showCouponsModal} onClose={() => setShowCouponsModal(false)} maxWidth="xs" fullWidth
+        PaperProps={{
+          sx: {
+            border: `2px solid ${theme.colors.primary}`,
+            borderRadius: theme.modal?.borderRadius || 8,
+          }
+        }}>
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', bgcolor: theme.colors.card, color: theme.colors.text }}>
           Available Coupons
           <IconButton onClick={() => setShowCouponsModal(false)} size="large" sx={{ color: theme.colors.secondaryText }}>
@@ -571,9 +600,15 @@ const SideMenu = ({
       {/* Help and FAQ Modal */}
       <Dialog open={showHelpModal} onClose={() => setShowHelpModal(false)} maxWidth="sm" fullWidth
         PaperProps={{
-          sx: { minWidth: 420, bgcolor: theme.colors.card, color: theme.colors.text, borderRadius: theme.modal?.borderRadius, boxShadow: theme.modal?.boxShadow }
-        }}
-      >
+          sx: { 
+            minWidth: 420, 
+            bgcolor: theme.colors.card, 
+            color: theme.colors.text, 
+            borderRadius: theme.modal?.borderRadius, 
+            boxShadow: theme.modal?.boxShadow,
+            border: `2px solid ${theme.colors.primary}`,
+          }
+        }}>
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', bgcolor: theme.colors.card, color: theme.colors.text }}>
           Help and FAQ
           <IconButton onClick={() => setShowHelpModal(false)} size="large" sx={{ position: 'absolute', right: 16, top: 12, color: theme.colors.secondaryText }}>

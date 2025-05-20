@@ -4,7 +4,7 @@ import { ThemeContext } from '../../context/ThemeContext';
 
 const Loader = ({ fullPage = false, size = 64, thickness = 4 }) => {
   const { theme } = useContext(ThemeContext);
-
+ 
   if (fullPage) {
     return (
       <div

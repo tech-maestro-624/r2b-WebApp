@@ -113,18 +113,21 @@ const HomePage = () => {
       setLoading(true);
       try {
         let res = await restaurantService.getAllCategories();
+        console.log('res categories', res);
         let categories = res.categories || [];
         categories = await Promise.all(categories.map(async cat => {
           let imageUrl = null;
           if (cat.image) {
             imageUrl = cat.image.startsWith('http') ? cat.image : await fileService.downloadFile(cat.image);
           }
+          console.log('imageUrl categories', imageUrl);
+          console.log('cat.image', cat);
           return {
             ...cat,
             imageUrl,
           };
         }));
-        console.log('categories images', categories.map(cat => cat.imageUrl));
+
         setCategories(categories);
       } catch (err) {
         setCategories([]);
@@ -854,6 +857,7 @@ const HomePage = () => {
                               style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '60px' }}
                               loading="lazy"
                             />
+                            
                           ) : (
                             <Box sx={{ width: 120, height: 120, borderRadius: '60px', bgcolor: theme.colors.card, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                               <Typography sx={{ color: theme.colors.text, fontSize: 36, fontWeight: 600 }}>🍽️</Typography>

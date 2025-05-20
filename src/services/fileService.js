@@ -21,7 +21,6 @@ export const fileService = {
         let imageUrl = decodeURIComponent(response.data);
         imageUrl = imageUrl.replace(/%2F/g, '/');
         // BYPASS CACHE: just return the direct URL
-        console.log('imageUrl from downloadFile', imageUrl);
         return imageUrl;
       }
       return null;

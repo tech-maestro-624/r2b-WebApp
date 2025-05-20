@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useContext } from 'react';
 import { restaurantService } from '../services/restaurantService';
+import { fileService } from '../services/fileService';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import CardMedia from '@mui/material/CardMedia';
@@ -26,7 +27,15 @@ const Categories = () => {
       setError(null);
       try {
         const res = await restaurantService.getAllCategories();
-        setCategories(res.categories || []);
+        // Process categories to download images
+        const processedCategories = await Promise.all((res.categories || []).map(async (category) => {
+          let imageUrl = null;
+          if (category.image) {
+            imageUrl = await fileService.downloadFile(category.image);
+          }
+          return { ...category, imageUrl };
+        }));
+        setCategories(processedCategories);
       } catch (err) {
         setError('Failed to load categories.');
       } finally {
@@ -170,10 +179,18 @@ const Categories = () => {
                     sx={{ borderRadius: 3, boxShadow: 3, background: theme?.colors?.card, color: theme?.colors?.text, p: 0, m: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', minWidth: 260, maxWidth: 320, width: '100%', transition: 'box-shadow 0.2s, transform 0.2s', '&:hover': { boxShadow: '0 4px 16px rgba(0,0,0,0.13)', transform: 'translateY(-2px) scale(1.03)' } }}
                     onClick={() => navigate(`/categories/${encodeURIComponent(cat.name.toLowerCase())}`, { state: { categoryId: cat._id } })}
                   >
-                    {cat.imageUrl && (
+                    {cat.imageUrl ? (
                       <CardMedia
                         component="img"
                         image={cat.imageUrl}
+                        alt={cat.name}
+                        sx={{ width: '100%', height: 180, objectFit: 'cover' }}
+                        loading="lazy"
+                      />
+                    ) : (
+                      <CardMedia
+                        component="img"
+                        image="https://via.placeholder.com/300x180?text=No+Image"
                         alt={cat.name}
                         sx={{ width: '100%', height: 180, objectFit: 'cover' }}
                         loading="lazy"

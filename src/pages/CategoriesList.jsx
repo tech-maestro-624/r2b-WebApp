@@ -107,10 +107,19 @@ const CategoriesList = () => {
             }
           }
           // Optionally resolve images
-          let imageUrl = restaurant.coverImageUrl || restaurant.logoUrl || 'https://via.placeholder.com/300x200?text=Image';
-          if (!restaurant.coverImageUrl && restaurant.coverImage) {
+          let imageUrl = null;
+          
+          // Use image or coverImage if available
+          if (restaurant.image) {
+            imageUrl = await fileService.downloadFile(restaurant.image);
+          } else if (restaurant.coverImage) {
             imageUrl = await fileService.downloadFile(restaurant.coverImage);
+          } else if (restaurant.coverImageUrl) {
+            imageUrl = restaurant.coverImageUrl;
+          } else if (restaurant.logoUrl) {
+            imageUrl = restaurant.logoUrl;
           }
+          
           return {
             ...restaurant,
             image: imageUrl,
@@ -283,9 +292,22 @@ const CategoriesList = () => {
                     }
                   }}
                 >
-                  {rest.image && (
+                  {rest.image ? (
                     <Box sx={{ width: '100%', height: 160, overflow: 'hidden', borderTopLeftRadius: 12, borderTopRightRadius: 12 }}>
-                      <img src={rest.image} alt={rest.name + ' cover'} style={{ width: '100%', height: '100%', objectFit: 'cover', borderTopLeftRadius: 12, borderTopRightRadius: 12 }} />
+                      {console.log('rest.image in card', rest.image)}
+                      <img 
+                        src={rest.image} 
+                        alt={rest.name + ' cover'} 
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', borderTopLeftRadius: 12, borderTopRightRadius: 12 }} 
+                      />
+                    </Box>
+                  ) : (
+                    <Box sx={{ width: '100%', height: 160, overflow: 'hidden', borderTopLeftRadius: 12, borderTopRightRadius: 12 }}>
+                      <img 
+                        src="https://via.placeholder.com/300x200?text=Image" 
+                        alt={rest.name + ' cover'} 
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', borderTopLeftRadius: 12, borderTopRightRadius: 12 }} 
+                      />
                     </Box>
                   )}
                   <Box sx={{ p: 2, pt: 1.5, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center' }}>

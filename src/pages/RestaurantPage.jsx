@@ -229,7 +229,24 @@ const RestaurantPage = () => {
         // Fetch menu for the branch
         const menuResRaw = await restaurantService.getFoodItems(branchId || restaurantData?.nearestBranchId);
         // If menuResRaw is an object with category keys, use it
+        console.log('menuResRaw', menuResRaw);
         if (menuResRaw && typeof menuResRaw === 'object' && !Array.isArray(menuResRaw)) {
+          // menuResRaw is an object with category keys and arrays of items
+          for (const categoryName of Object.keys(menuResRaw)) {
+            menuResRaw[categoryName] = await Promise.all(menuResRaw[categoryName].map(async item => {
+              let imageUrl = null;
+              if (item.image) {
+                if (Array.isArray(item.image)) {
+                  imageUrl = item.image.length > 0 ? await fileService.downloadFile(item.image[0]) : null;
+                } else {
+                  imageUrl = await fileService.downloadFile(item.image);
+                }
+              }
+              console.log('item', item.image);
+              console.log('imageUrl', imageUrl);
+              return { ...item, image: imageUrl };
+            }));
+          }
           setMenuRes(menuResRaw);
           // Set the selected category based on navigation state
           if (categoryFromNavigation && menuResRaw[categoryFromNavigation]) {
@@ -338,6 +355,7 @@ const RestaurantPage = () => {
 
       // Fetch new menu for the selected branch
       const menuResRaw = await restaurantService.getFoodItems(newBranchId);
+      console.log('menuResRaw', menuResRaw);
       if (menuResRaw && typeof menuResRaw === 'object' && !Array.isArray(menuResRaw)) {
         setMenuRes(menuResRaw);
         setMenu(menuResRaw?.categories || []);
@@ -621,23 +639,23 @@ console.log('branch',branch);
                   <Typography variant="h6" sx={{ mb: 1, color: theme.colors.text, fontWeight: 500, fontSize: { xs: '1.1rem', sm: '1.2rem', md: '1.25rem', lg: '1.3rem' } }}>
                     {restaurant?.description}
                   </Typography>
-                  <Typography variant="body1" sx={{ mb: 1, color: theme.colors.secondaryText, fontWeight: 500, fontSize: { xs: '1.05rem', sm: '1.12rem', md: '1.15rem', lg: '1.18rem' } }}>
+                  <Typography variant="body1" sx={{ mb: 1, color: theme.colors.text, fontWeight: 500, fontSize: { xs: '1.05rem', sm: '1.12rem', md: '1.15rem', lg: '1.18rem' } }}>
                     {branch ? branch.address : 'No address available'}
                   </Typography>
                   {branch && branch.city && (
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-                      <Typography variant="body1" sx={{ mb: 0, color: '#000', fontWeight: 500, fontSize: { xs: '1.05rem', sm: '1.12rem', md: '1.15rem', lg: '1.18rem' } }}>
+                      <Typography variant="body1" sx={{ mb: 0, color: theme.colors.text, fontWeight: 500, fontSize: { xs: '1.05rem', sm: '1.12rem', md: '1.15rem', lg: '1.18rem' } }}>
                       {branch.city}
                     </Typography>
                       {/* Dummy Ratings */}
                       <Box sx={{ display: 'flex', alignItems: 'center', bgcolor: theme.colors.card, borderRadius: 2, px: 1.5, py: 0.5, border: `1px solid ${theme.colors.primary}` }}>
-                        <Typography sx={{ fontWeight: 700, color: '#000', fontSize: 16, mr: 0.5 }}>
+                        <Typography sx={{ fontWeight: 700, color: theme.colors.text, fontSize: 16, mr: 0.5 }}>
                           {averageRating || '—'}
                         </Typography>
                         <span style={{ color: '#FFD700', fontSize: 18, fontWeight: 700, marginRight: 4 }}>★</span>
                       </Box>
                       {/* See Reviews Button */}
-                      <Button variant="outlined" size="small" sx={{ color: '#000', borderColor: theme.colors.primary, fontWeight: 600, borderRadius: 2, ml: 1, px: 2, py: 0.5, fontSize: 14, textTransform: 'none', '&:hover': { bgcolor: `${theme.colors.primary}10`, borderColor: theme.colors.primary, color: '#000' } }}
+                      <Button variant="outlined" size="small" sx={{ color: theme.colors.text, borderColor: theme.colors.primary, fontWeight: 600, borderRadius: 2, ml: 1, px: 2, py: 0.5, fontSize: 14, textTransform: 'none', '&:hover': { bgcolor: `${theme.colors.primary}10`, borderColor: theme.colors.primary } }}
                         onClick={() => setReviewsOpen(true)}
                       >
                         See Reviews
@@ -958,6 +976,8 @@ console.log('branch',branch);
  
                   // If item has variants, set price to first variant's price
                   let displayItem = { ...item };
+                  console.log('displayItem', displayItem);
+                  console.log('displayItem.image url', displayItem.imageUrl);
                   if (displayItem.hasVariants && Array.isArray(displayItem.variants) && displayItem.variants.length > 0) {
                     displayItem.price = displayItem.variants[0].price;
                   }
@@ -989,6 +1009,7 @@ console.log('branch',branch);
                         pointerEvents: !displayItem.isAvailable ? 'none' : 'auto',
                       }}
                     >
+                      {console.log('displayItem.image', displayItem.image)}
                       <CardMedia
                         component="img"
                         image={displayItem.image || 'https://via.placeholder.com/120'}

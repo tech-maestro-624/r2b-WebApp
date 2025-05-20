@@ -118,11 +118,70 @@ const GlobalAuthModals = () => {
                 bgcolor: theme.colors?.inputBackground || theme.modal.background,
                 textAlign: 'center',
                 fontSize: 24,
-                fontFamily: `'Apple Color Emoji','Segoe UI Emoji','Segoe UI Symbol','Noto Color Emoji',sans-serif`
+                fontFamily: `'Apple Color Emoji','Segoe UI Emoji','Segoe UI Symbol','Noto Color Emoji',sans-serif`,
+                '& .MuiInputBase-input': {
+                  color: theme.colors.text,
+                },
+                '& .MuiOutlinedInput-root': {
+                  '& fieldset': {
+                    borderColor: theme.colors.border,
+                  },
+                  '&:hover fieldset': {
+                    borderColor: theme.colors.primary,
+                  },
+                  '&.Mui-focused fieldset': {
+                    borderColor: theme.colors.primary,
+                  },
+                },
+              }}
+              MenuProps={{
+                PaperProps: {
+                  sx: {
+                    bgcolor: theme.colors.card,
+                    color: theme.colors.text,
+                    '& .MuiMenuItem-root': {
+                      fontSize: 16,
+                      fontWeight: 500,
+                      color: theme.colors.text,
+                      '&:hover': {
+                        bgcolor: theme.colors.primary,
+                        color: '#FFFFFF',
+                      },
+                      '&.Mui-selected': {
+                        bgcolor: theme.colors.primary,
+                        color: '#FFFFFF',
+                        '&:hover': {
+                          bgcolor: theme.colors.primary,
+                          color: '#FFFFFF',
+                        },
+                      },
+                    },
+                  },
+                },
               }}
             >
               {COUNTRY_OPTIONS.map(option => (
-                <MenuItem key={option.value} value={option.value}>
+                <MenuItem 
+                  key={option.value} 
+                  value={option.value}
+                  sx={{
+                    bgcolor: theme.colors.card,
+                    color: theme.colors.text,
+                    padding: '10px 16px',
+                    '&:hover': {
+                      bgcolor: theme.colors.primary,
+                      color: '#FFFFFF',
+                    },
+                    '&.Mui-selected': {
+                      bgcolor: theme.colors.primary,
+                      color: '#FFFFFF',
+                      '&:hover': {
+                        bgcolor: theme.colors.primary,
+                        color: '#FFFFFF',
+                      },
+                    },
+                  }}
+                >
                   {option.flag}
                 </MenuItem>
               ))}
@@ -134,8 +193,37 @@ const GlobalAuthModals = () => {
               onChange={e => setPhone(e.target.value)}
               variant="outlined"
               fullWidth
-              sx={{ bgcolor: theme.colors?.inputBackground || theme.modal.background }}
-              inputProps={{ maxLength: 15 }}
+              sx={{ 
+                bgcolor: theme.colors?.inputBackground || theme.modal.background,
+                '& .MuiInputBase-input': {
+                  color: theme.colors.text,
+                },
+                '& .MuiOutlinedInput-root': {
+                  '& fieldset': {
+                    borderColor: theme.colors.border,
+                  },
+                  '&:hover fieldset': {
+                    borderColor: theme.colors.primary,
+                  },
+                  '&.Mui-focused fieldset': {
+                    borderColor: theme.colors.primary,
+                  },
+                },
+                '& .MuiInputLabel-root': {
+                  color: theme.colors.secondaryText,
+                },
+                '& .MuiInputLabel-root.Mui-focused': {
+                  color: theme.colors.primary,
+                },
+                '& .MuiInputBase-input::placeholder': {
+                  color: theme.colors.secondaryText,
+                  opacity: 0.7,
+                },
+              }}
+              inputProps={{ 
+                maxLength: 15,
+                style: { color: theme.colors.text }
+              }}
             />
           </Box>
           {errorMessage && (
@@ -189,14 +277,33 @@ const GlobalAuthModals = () => {
               bgcolor: theme.colors?.inputBackground || theme.modal.background, 
               mb: 3, 
               letterSpacing: 4, 
-              textAlign: 'center' 
+              textAlign: 'center',
+              '& .MuiInputBase-input': {
+                color: theme.colors.text,
+              },
+              '& .MuiOutlinedInput-root': {
+                '& fieldset': {
+                  borderColor: theme.colors.border,
+                },
+                '&:hover fieldset': {
+                  borderColor: theme.colors.primary,
+                },
+                '&.Mui-focused fieldset': {
+                  borderColor: theme.colors.primary,
+                },
+              },
+              '& .MuiInputBase-input::placeholder': {
+                color: theme.colors.secondaryText,
+                opacity: 0.7,
+              },
             }}
             inputProps={{ 
               maxLength: 6, 
               style: { 
                 textAlign: 'center', 
                 letterSpacing: 4, 
-                fontSize: 20 
+                fontSize: 20,
+                color: theme.colors.text
               } 
             }}
           />

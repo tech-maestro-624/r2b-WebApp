@@ -536,43 +536,6 @@ const Navbar = ({
           </Box>
         </Toolbar>
       </AppBar>
-      <Dialog open={showLogoutModal} onClose={() => setShowLogoutModal(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', bgcolor: theme.colors.card, color: theme.colors.text }}>
-          Logout
-          <IconButton onClick={() => setShowLogoutModal(false)} size="large" sx={{ color: theme.colors.secondaryText }}>
-            <CloseIcon />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent sx={{ bgcolor: theme.colors.card, textAlign: 'center', pt: 3 }}>
-          <Typography sx={{ fontSize: 22, mb: 3, color: theme.colors.text }}>Do you want to logout?</Typography>
-        </DialogContent>
-        <DialogActions sx={{ bgcolor: theme.colors.card, pb: 3, px: 3, justifyContent: 'center' }}>
-          <Button
-            variant="contained"
-            sx={{ bgcolor: theme.colors.primary, color: '#fff', fontWeight: 600, fontSize: 18, borderRadius: 2, px: 4, py: 1, boxShadow: 'none', '&:hover': { bgcolor: theme.colors.primary }, mr: 2 }}
-            onClick={async () => {
-              try {
-                setShowLogoutModal(false);
-                await logout();
-                // Force a page reload to ensure all state is reset
-                window.location.href = '/';
-              } catch (error) {
-                console.error('Logout error:', error);
-                setSnackbar({ open: true, message: 'Failed to logout. Please try again.', severity: 'error' });
-              }
-            }}
-          >
-            Logout
-          </Button>
-          <Button
-            variant="outlined"
-            sx={{ color: theme.colors.text, borderColor: theme.colors.border, fontWeight: 600, fontSize: 18, borderRadius: 2, px: 4, py: 1, boxShadow: 'none', '&:hover': { borderColor: theme.colors.primary } }}
-            onClick={() => setShowLogoutModal(false)}
-          >
-            Cancel
-          </Button>
-        </DialogActions>
-      </Dialog>
       <Snackbar
         open={snackbar.open}
         autoHideDuration={3000}

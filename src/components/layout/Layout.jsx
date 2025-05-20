@@ -100,6 +100,8 @@ const Layout = ({ children, Component, componentKey }) => {
         openAddressModal={handleOpenAddressModal}
         onNavigate={handleNavigate}
         isActive={isActive}
+        showLogoutModal={showLogoutModal}
+        setShowLogoutModal={setShowLogoutModal}
       />
       
       {/* Main Content */}
